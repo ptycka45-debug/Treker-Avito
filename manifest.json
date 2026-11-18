@@ -2,7 +2,7 @@
   "name": "Трекер Лимитов Avito — Авито и Влада",
   "short_name": "Лимиты Avito",
   "start_url": "/Treker-Avito/",
-"scope": "/Treker-Avito/"
+  "scope": "/Treker-Avito/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f172a",
