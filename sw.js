@@ -1,4 +1,4 @@
-const CACHE_NAME = 'avito-treker-v1';
+const CACHE_NAME = 'avito-treker-v2';
 const ASSETS = [
   '/Treker/',
   '/Treker/index.html',
