@@ -1,4 +1,5 @@
-navigator.serviceWorker.register('/Treker-Avito/sw.js', { scope: '/Treker-Avito/' })
+const CACHE_NAME = 'avito-treker-v3';
+
 const ASSETS = [
   '/Treker-Avito/',
   '/Treker-Avito/index.html',
