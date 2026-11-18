@@ -1,8 +1,8 @@
 navigator.serviceWorker.register('/Treker-Avito/sw.js', { scope: '/Treker-Avito/' })
 const ASSETS = [
-  '/Treker/',
-  '/Treker/index.html',
-  '/Treker/manifest.json'
+  '/Treker-Avito/',
+  '/Treker-Avito/index.html',
+  '/Treker-Avito/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
