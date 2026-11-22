@@ -1,0 +1,1915 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Лимиты Avito">
+<link id="pwa-manifest-link" rel="manifest" href="./manifest.json">
+<link id="pwa-apple-icon" rel="apple-touch-icon" sizes="512x512" href="">
+<link id="pwa-favicon" rel="icon" type="image/png" sizes="192x192" href="">
+
+<script>
+  // 1. Ранний перехват beforeinstallprompt строго до DOMContentLoaded
+  window.__deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window.__deferredInstallPrompt = e;
+    var installBtn = document.getElementById('btn-pwa-install');
+    if (installBtn) {
+      installBtn.classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('appinstalled', function() {
+    window.__deferredInstallPrompt = null;
+    var installBtn = document.getElementById('btn-pwa-install');
+    if (installBtn) {
+      installBtn.classList.add('hidden');
+    }
+    if (typeof window.showPwaToast === 'function') {
+      window.showPwaToast('✅ Приложение «Лимиты Avito» успешно установлено!');
+    }
+  });
+
+  // 2. Генерация настоящих растровых PNG-иконок через <canvas> и динамический манифест (Blob)
+  (function setupDynamicPwa() {
+    function renderAvitoIconDataUrl(size, isMaskable) {
+      var canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      var ctx = canvas.getContext('2d');
+
+      if (isMaskable) {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, size, size);
+      }
+
+      // Безопасный отступ 10% для maskable, 4% для any
+      var pad = Math.round(size * (isMaskable ? 0.10 : 0.04));
+      var inner = size - pad * 2;
+      var radius = Math.round(inner * 0.24);
+      var borderW = Math.max(2, Math.round(inner * 0.05));
+
+      function roundRectPath(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      // Градиент карточки логотипа
+      var grad = ctx.createLinearGradient(pad, pad, pad + inner, pad + inner);
+      grad.addColorStop(0, '#e0f2fe');
+      grad.addColorStop(0.5, '#ffffff');
+      grad.addColorStop(1, '#ecfccb');
+
+      roundRectPath(pad, pad, inner, inner, radius);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.lineWidth = borderW;
+      ctx.strokeStyle = '#f97316';
+      ctx.stroke();
+
+      // 4 фирменных кружка в стиле Avito
+      var dots = [
+        { cx: 14.5 / 40, cy: 14.0 / 40, r: 6.2 / 40, color: '#00AAFF' },
+        { cx: 27.2 / 40, cy: 13.5 / 40, r: 4.3 / 40, color: '#FF6163' },
+        { cx: 13.5 / 40, cy: 26.5 / 40, r: 3.2 / 40, color: '#9747FF' },
+        { cx: 25.5 / 40, cy: 25.5 / 40, r: 6.8 / 40, color: '#82D127' }
+      ];
+
+      for (var i = 0; i < dots.length; i++) {
+        var d = dots[i];
+        ctx.beginPath();
+        ctx.arc(pad + d.cx * inner, pad + d.cy * inner, d.r * inner, 0, Math.PI * 2);
+        ctx.fillStyle = d.color;
+        ctx.fill();
+      }
+
+      return canvas.toDataURL('image/png');
+    }
+
+    try {
+      var png192Any = renderAvitoIconDataUrl(192, false);
+      var png512Any = renderAvitoIconDataUrl(512, false);
+      var png512Maskable = renderAvitoIconDataUrl(512, true);
+
+      var appleLink = document.getElementById('pwa-apple-icon');
+      if (appleLink) appleLink.href = png512Any;
+
+      var favLink = document.getElementById('pwa-favicon');
+      if (favLink) favLink.href = png192Any;
+
+      var startUrl = new URL('./index.html', window.location.href).href;
+      var scopeUrl = new URL('./', window.location.href).href;
+
+      var dynamicManifest = {
+        id: scopeUrl,
+        name: 'Трекер Лимитов Avito — Авито и Влада',
+        short_name: 'Лимиты Avito',
+        description: 'Контроль лимитов публикаций и продаж для профилей Авито 1 (1+2) и Влада',
+        start_url: startUrl,
+        scope: scopeUrl,
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#0f172a',
+        theme_color: '#0f172a',
+        icons: [
+          { src: png192Any, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: png512Any, sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: png512Maskable, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        ]
+      };
+
+      var blob = new Blob([JSON.stringify(dynamicManifest)], { type: 'application/manifest+json' });
+      var blobUrl = URL.createObjectURL(blob);
+      var manifestEl = document.getElementById('pwa-manifest-link');
+      if (manifestEl) manifestEl.href = blobUrl;
+    } catch (err) {
+      // Fallback к статическому ./manifest.json при ошибке
+    }
+  })();
+
+  // 3. Регистрация Service Worker (./sw.js)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function() {});
+    });
+  }
+</script>
+
+<title>Трекер Лимитов Avito — Авито и Влада</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  html, body {
+    touch-action: manipulation;
+  }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #e0f2fe 0%, #ede9fe 48%, #dcfce7 100%);
+    background-attachment: fixed;
+    color: #0f172a;
+    overflow-x: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  header.app-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  button, a, select, input, label {
+    touch-action: manipulation;
+  }
+  .card {
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- Vibrant Top Header -->
+<header class="app-header bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-b border-indigo-800/60 sticky top-0 z-30 shadow-lg">
+  <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 space-y-3">
+
+    <!-- Top Row: Avito Logo Icon + Secondary Utilities + PWA Install -->
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Avito-style 4-dot badge -->
+        <div class="w-11 h-11 rounded-2xl bg-white border-2 border-orange-500 shadow-md flex items-center justify-center shrink-0 relative overflow-hidden">
+          <div class="absolute inset-0 bg-gradient-to-br from-sky-100 via-white to-lime-100"></div>
+          <svg viewBox="0 0 40 40" class="w-8 h-8 relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14.5" cy="14" r="6.2" fill="#00AAFF"/>
+            <circle cx="27.2" cy="13.5" r="4.3" fill="#FF6163"/>
+            <circle cx="13.5" cy="26.5" r="3.2" fill="#9747FF"/>
+            <circle cx="25.5" cy="25.5" r="6.8" fill="#82D127"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-base sm:text-lg font-black tracking-tight text-white leading-tight truncate">Трекер Лимитов Avito</h1>
+          <p class="text-[11px] text-sky-200/90 font-medium truncate">Авито 1 (1+2) и Влада • Время МСК</p>
+        </div>
+      </div>
+
+      <!-- Secondary Navigation Buttons + PWA Install Buttons -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <button onclick="triggerPwaInstall()" id="btn-pwa-install" class="hidden px-3 py-1.5 rounded-lg text-xs font-extrabold bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 shadow-sm transition flex items-center gap-1">
+          <span>📲 Установить</span>
+        </button>
+        <button onclick="openInstallHelpModal()" id="btn-pwa-help" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/30 hover:bg-indigo-500/50 text-sky-100 border border-indigo-400/40 transition" title="Как добавить ярлык на экран телефона">
+          <span>📱 На экран</span>
+        </button>
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/15 text-white hover:bg-white/25 transition">
+          📊 Дашборд
+        </button>
+        <button onclick="switchTab('catalog')" id="tab-catalog" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/15 text-white hover:bg-white/25 transition">
+          📚 Справочник
+        </button>
+        <button onclick="switchTab('sync')" id="tab-sync" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/15 text-white hover:bg-white/25 transition">
+          🔌 Avito
+        </button>
+      </div>
+    </div>
+
+    <!-- Primary Large Profile Switcher Buttons + Action Buttons -->
+    <div class="flex flex-wrap items-center justify-between gap-2.5 pt-0.5">
+      <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto sm:min-w-[360px]">
+        <button onclick="switchTab('ads_p1')" id="tab-ads_p1" class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md ring-2 ring-sky-300 transition">
+          <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+          <span>Авито 1</span>
+          <span id="nav-p1-count" class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-black/25 text-white">0</span>
+        </button>
+
+        <button onclick="switchTab('ads_p2')" id="tab-ads_p2" class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-white/10 text-white border border-white/20 hover:bg-white/20 transition">
+          <span class="w-2.5 h-2.5 rounded-full bg-fuchsia-400"></span>
+          <span>Влада</span>
+          <span id="nav-p2-count" class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-white/15 text-white">0</span>
+        </button>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <button onclick="openAddModal()" class="flex-1 sm:flex-initial justify-center bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs sm:text-sm font-extrabold px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-1.5">
+          <span>+ Добавить товар</span>
+        </button>
+        <button onclick="exportBackup()" class="bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition shadow-xs flex items-center gap-1.5" title="Скачать резервную копию данных в JSON">
+          <span>💾 Копия</span>
+        </button>
+        <button onclick="exportExcel()" class="bg-white/15 hover:bg-white/25 text-white border border-white/20 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition" title="Скачать Excel">
+          ⬇️ Excel
+        </button>
+        <label class="bg-white/15 hover:bg-white/25 text-white border border-white/20 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl cursor-pointer transition" title="Загрузить резервную копию JSON или Excel">
+          ⬆️ Импорт
+          <input type="file" id="excelInput" accept=".xlsx,.xls,.json,application/json" class="hidden" onchange="importExcel(event)">
+        </label>
+      </div>
+    </div>
+
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+  <!-- ==================== TAB 1: DASHBOARD ==================== -->
+  <section id="view-dashboard" class="hidden space-y-6">
+    <div class="card p-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+          <button onclick="setDashProfile('p1')" id="dash-btn-p1" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-xs transition">
+            🔵 Авито 1 (1 + 2 связанный)
+          </button>
+          <button onclick="setDashProfile('p2')" id="dash-btn-p2" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+            🟣 Влада
+          </button>
+        </div>
+
+        <select id="dash-month" onchange="renderDashboard()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold bg-white outline-none"></select>
+        <select id="dash-year" onchange="renderDashboard()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold bg-white outline-none"></select>
+        <span class="text-xs text-slate-500 font-medium">Опорная дата: <input type="date" id="ref-today" onchange="renderAll()" class="border border-slate-300 rounded px-2 py-1 text-slate-700 font-semibold"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-xs sm:text-sm font-semibold text-slate-700">Цель/мес (<span id="goal-prof-label">Авито 1</span>):</label>
+        <input type="number" id="month-goal" value="30" min="1" onchange="saveGoal(); renderDashboard()" class="w-16 border border-slate-300 rounded-lg px-2 py-1 text-sm font-extrabold text-center">
+      </div>
+    </div>
+
+    <!-- Top KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card p-4 border-t-4 border-t-sky-500">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-700">Активно сейчас</span>
+          <span class="text-xl">🔥</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpi-active" class="text-3xl font-black text-slate-900">0</span>
+          <span class="text-xs font-medium text-slate-500">занимают лимит (≤ 30 дн.)</span>
+        </div>
+        <div id="kpi-free-soon" class="mt-2 text-xs text-sky-700 font-bold">Освободится в ближайшие 7 дн.: 0</div>
+      </div>
+
+      <div class="card p-4 border-t-4 border-t-indigo-500">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-700">Публикаций за месяц</span>
+          <span class="text-xl">📈</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpi-month-pubs" class="text-3xl font-black text-slate-900">0</span>
+          <span id="kpi-month-diff" class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">—</span>
+        </div>
+        <div id="kpi-pub-breakdown" class="mt-2 text-xs text-slate-600 font-medium">Новых: 0 • Продл.: 0 • Переопубл.: 0</div>
+      </div>
+
+      <div class="card p-4 border-t-4 border-t-emerald-500">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">Выполнение цели</span>
+          <span id="kpi-goal-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Темп хороший</span>
+        </div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span id="kpi-goal-pct" class="text-3xl font-black text-slate-900">0%</span>
+          <span id="kpi-goal-frac" class="text-xs font-semibold text-slate-600">0 из 30</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-2.5 mt-2.5 overflow-hidden">
+          <div id="kpi-goal-bar" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="card p-4 border-t-4 border-t-amber-500">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Продажи за месяц</span>
+          <span class="text-xl">💰</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpi-revenue" class="text-2xl font-black text-slate-900">0 ₽</span>
+        </div>
+        <div id="kpi-sales-meta" class="mt-2 text-xs text-slate-600 font-medium">Продано: 0 шт. • Ср. чек: 0 ₽</div>
+      </div>
+    </div>
+
+    <!-- Alerts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="card p-4 border-l-4 border-l-rose-600">
+        <h3 class="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+          <span>🟥</span> Лимит исчерпан (0 мест)
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">Сюда бесплатно публиковать нельзя до даты освобождения</p>
+        <div id="list-exhausted" class="mt-3 space-y-2 max-h-48 overflow-y-auto text-xs"></div>
+      </div>
+
+      <div class="card p-4 border-l-4 border-l-amber-500">
+        <h3 class="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+          <span>⚠️</span> Скоро закончится (1–2 места)
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">Планируйте публикации в этих подгруппах осторожно</p>
+        <div id="list-warning" class="mt-3 space-y-2 max-h-48 overflow-y-auto text-xs"></div>
+      </div>
+
+      <div class="card p-4 border-l-4 border-l-sky-600">
+        <h3 class="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+          <span>⏰</span> Освободятся в ближайшие 7 дней
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">Слоты, которые скоро сгорят и освободят место</p>
+        <div id="list-releasing" class="mt-3 space-y-2 max-h-48 overflow-y-auto text-xs"></div>
+      </div>
+    </div>
+
+    <!-- Main Limit Tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card overflow-hidden">
+        <div class="p-4 border-b border-slate-200 bg-gradient-to-r from-sky-50 to-indigo-50">
+          <h3 class="text-sm font-extrabold text-slate-900">📦 Расход общих лимитов (Подкатегории Ур. 2)</h3>
+          <p class="text-xs text-slate-600 mt-0.5">Контроль больших категорий в целом за последние 30 дней</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                <th class="py-2.5 px-3 font-bold">Подкатегория</th>
+                <th class="py-2.5 px-2 font-bold text-center">Лимит</th>
+                <th class="py-2.5 px-2 font-bold text-center">Занято</th>
+                <th class="py-2.5 px-2 font-bold text-center">Остаток</th>
+                <th class="py-2.5 px-3 font-bold text-right">Ближ. освобожд.</th>
+              </tr>
+            </thead>
+            <tbody id="table-general-limits" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="p-4 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-pink-50">
+          <h3 class="text-sm font-extrabold text-slate-900">🎯 Внутренние (точечные) лимиты</h3>
+          <p class="text-xs text-slate-600 mt-0.5">Скрытые рамки Avito внутри конкретных подгрупп</p>
+        </div>
+        <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="sticky top-0 bg-slate-100 z-10">
+              <tr class="text-slate-700 border-b border-slate-200">
+                <th class="py-2.5 px-3 font-bold">Внутренняя группа</th>
+                <th class="py-2.5 px-2 font-bold text-center">Лимит</th>
+                <th class="py-2.5 px-2 font-bold text-center">Занято</th>
+                <th class="py-2.5 px-2 font-bold text-center">Остаток</th>
+                <th class="py-2.5 px-3 font-bold text-right">Освободится</th>
+              </tr>
+            </thead>
+            <tbody id="table-inner-limits" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Free Niches Showcase -->
+    <div class="card p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-900">✨ 100% свободные ниши (Витрина возможностей)</h3>
+          <p class="text-xs text-slate-600">Категории с общим лимитом, где в выбранном профиле сейчас 0 активных объявлений</p>
+        </div>
+      </div>
+      <div id="free-niches-badges" class="flex flex-wrap gap-2"></div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 2A: АВИТО 1 ==================== -->
+  <section id="view-ads_p1" class="space-y-3">
+    <!-- Compact Bar: Collapsible Search + Sort + Legend -->
+    <div class="card p-3 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="toggleFilterPanel('p1')" id="p1-filter-toggle" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-300 transition">
+            <span>🔍 Поиск и фильтры</span>
+            <span id="p1-filter-badge" class="hidden px-1.5 py-0.2 rounded-full bg-sky-600 text-white text-[10px]">акт.</span>
+            <span id="p1-filter-arrow" class="text-[10px]">▼</span>
+          </button>
+
+          <!-- Sort Selector -->
+          <select id="p1-sort" onchange="renderAdsTable('p1')" class="border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold bg-white text-slate-800 focus:ring-2 focus:ring-sky-500 outline-none">
+            <option value="date_desc">⬇️ Новые сверху</option>
+            <option value="status_active">🔥 Сначала активные</option>
+            <option value="status_expired">⏳ Сначала сгоревшие</option>
+            <option value="where_asc">🎨 По месту продажи</option>
+            <option value="sold_first">💰 Сначала проданные</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2.5 text-xs text-slate-700 font-medium">
+          <span>Активных: <strong id="p1-active-count" class="text-sky-700 font-extrabold">0</strong></span>
+          <span class="text-slate-300">|</span>
+          <span>Сгорело: <strong id="p1-expired-count" class="text-rose-600 font-extrabold">0</strong></span>
+          <span class="text-slate-300">|</span>
+          <span>Всего: <strong id="p1-shown-count" class="text-slate-900 font-extrabold">0</strong></span>
+        </div>
+      </div>
+
+      <!-- Color Legend Bar -->
+      <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-bold pt-0.5">
+        <span class="text-slate-500 font-semibold mr-0.5">Цвета:</span>
+        <span class="px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-300">✅ Активно / ❌ Сгорело</span>
+        <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300">🟢 Авито</span>
+        <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300">🟣 ВБ</span>
+        <span class="px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300">🔵 Телеграм</span>
+        <span class="px-2 py-0.5 rounded-md bg-lime-100 text-lime-900 border border-lime-300">🌿 Вацап</span>
+        <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">🟠 MAX</span>
+      </div>
+
+      <!-- Collapsible Search & Filter Panel (Collapsed by default) -->
+      <div id="p1-filter-panel" class="hidden pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <input type="text" id="p1-search" oninput="renderAdsTable('p1')" placeholder="Поиск по названию или категории..." class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-sky-500 outline-none">
+
+        <select id="p1-status-filter" onchange="renderAdsTable('p1')" class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white truncate font-medium">
+          <option value="all" selected>Все объявления</option>
+          <option value="active">🔥 Только активные (≤30 дн.)</option>
+          <option value="expired">⏳ Только сгоревшие (&gt;30 дн.)</option>
+          <option value="sold">💰 Только проданные</option>
+        </select>
+
+        <select id="p1-sub-filter" onchange="renderAdsTable('p1')" class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white truncate font-medium">
+          <option value="all">Оба связанных (1 и 2)</option>
+          <option value="1">Только основной (1)</option>
+          <option value="2">Только связанный (2)</option>
+        </select>
+
+        <select id="p1-cat-filter" onchange="renderAdsTable('p1')" class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white truncate font-medium">
+          <option value="all">Все категории</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Ads Table -->
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-800 text-white">
+              <th class="py-3 px-3 font-bold">Дата разм. / <span class="text-emerald-300">продажи</span></th>
+              <th class="py-3 px-2 font-bold text-center">Проф.</th>
+              <th class="py-3 px-3 font-bold">Название объявления</th>
+              <th class="py-3 px-3 font-bold">Категория / Подкатегория</th>
+              <th class="py-3 px-2 font-bold text-center">Лимиты</th>
+              <th class="py-3 px-2 font-bold text-center">Освободится</th>
+              <th class="py-3 px-2 font-bold">Тип</th>
+              <th class="py-3 px-3 font-bold text-right">Сумма / Где</th>
+              <th class="py-3 px-3 font-bold text-center">Действия</th>
+            </tr>
+          </thead>
+          <tbody id="p1-tbody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 2B: ВЛАДА ==================== -->
+  <section id="view-ads_p2" class="hidden space-y-3">
+    <div class="card p-3 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="toggleFilterPanel('p2')" id="p2-filter-toggle" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 transition">
+            <span>🔍 Поиск и фильтры</span>
+            <span id="p2-filter-badge" class="hidden px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[10px]">акт.</span>
+            <span id="p2-filter-arrow" class="text-[10px]">▼</span>
+          </button>
+
+          <select id="p2-sort" onchange="renderAdsTable('p2')" class="border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold bg-white text-slate-800 focus:ring-2 focus:ring-purple-500 outline-none">
+            <option value="date_desc">⬇️ Новые сверху</option>
+            <option value="status_active">🔥 Сначала активные</option>
+            <option value="status_expired">⏳ Сначала сгоревшие</option>
+            <option value="where_asc">🎨 По месту продажи</option>
+            <option value="sold_first">💰 Сначала проданные</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2.5 text-xs text-slate-700 font-medium">
+          <span>Активных: <strong id="p2-active-count" class="text-purple-700 font-extrabold">0</strong></span>
+          <span class="text-slate-300">|</span>
+          <span>Сгорело: <strong id="p2-expired-count" class="text-rose-600 font-extrabold">0</strong></span>
+          <span class="text-slate-300">|</span>
+          <span>Всего: <strong id="p2-shown-count" class="text-slate-900 font-extrabold">0</strong></span>
+        </div>
+      </div>
+
+      <!-- Color Legend Bar -->
+      <div class="flex flex-wrap items-center gap-1.5 text-[11px] font-bold pt-0.5">
+        <span class="text-slate-500 font-semibold mr-0.5">Цвета:</span>
+        <span class="px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-300">✅ Активно / ❌ Сгорело</span>
+        <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-300">🟢 Авито</span>
+        <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300">🟣 ВБ</span>
+        <span class="px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300">🔵 Телеграм</span>
+        <span class="px-2 py-0.5 rounded-md bg-lime-100 text-lime-900 border border-lime-300">🌿 Вацап</span>
+        <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">🟠 MAX</span>
+      </div>
+
+      <!-- Collapsible Search & Filter Panel -->
+      <div id="p2-filter-panel" class="hidden pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input type="text" id="p2-search" oninput="renderAdsTable('p2')" placeholder="Поиск по названию или категории..." class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none">
+
+        <select id="p2-status-filter" onchange="renderAdsTable('p2')" class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white truncate font-medium">
+          <option value="all" selected>Все объявления</option>
+          <option value="active">🔥 Только активные (≤30 дн.)</option>
+          <option value="expired">⏳ Только сгоревшие (&gt;30 дн.)</option>
+          <option value="sold">💰 Только проданные</option>
+        </select>
+
+        <select id="p2-cat-filter" onchange="renderAdsTable('p2')" class="w-full min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white truncate font-medium">
+          <option value="all">Все категории</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-800 text-white">
+              <th class="py-3 px-3 font-bold">Дата разм. / <span class="text-emerald-300">продажи</span></th>
+              <th class="py-3 px-3 font-bold">Название объявления</th>
+              <th class="py-3 px-3 font-bold">Категория / Подкатегория</th>
+              <th class="py-3 px-2 font-bold text-center">Лимиты</th>
+              <th class="py-3 px-2 font-bold text-center">Освободится</th>
+              <th class="py-3 px-2 font-bold">Тип</th>
+              <th class="py-3 px-3 font-bold text-right">Сумма / Где</th>
+              <th class="py-3 px-3 font-bold text-center">Действия</th>
+            </tr>
+          </thead>
+          <tbody id="p2-tbody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 3: CATALOG ==================== -->
+  <section id="view-catalog" class="hidden space-y-4">
+    <div class="card p-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-extrabold text-slate-900">Справочник лимитов Avito (880 позиций)</h2>
+        <p class="text-xs text-slate-600">Сравнение занятых мест одновременно по «Авито 1» и «Влада»</p>
+      </div>
+      <input type="text" id="catalog-search" oninput="renderCatalog()" placeholder="Найти категорию, например: куртки, книги..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-full sm:w-80 focus:ring-2 focus:ring-sky-500 outline-none">
+    </div>
+    <div class="card overflow-hidden">
+      <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="sticky top-0 bg-slate-800 text-white z-10">
+            <tr>
+              <th class="py-2.5 px-3 font-bold">Категория (Ур 1)</th>
+              <th class="py-2.5 px-3 font-bold">Подкатегория (Ур 2)</th>
+              <th class="py-2.5 px-3 font-bold">Уточнение (Ур 3)</th>
+              <th class="py-2.5 px-3 font-bold text-center">Общий лимит</th>
+              <th class="py-2.5 px-3 font-bold text-center">Внутр. лимит</th>
+              <th class="py-2.5 px-3 font-bold text-center text-sky-300">Занято (Авито 1)</th>
+              <th class="py-2.5 px-3 font-bold text-center text-fuchsia-300">Занято (Влада)</th>
+            </tr>
+          </thead>
+          <tbody id="catalog-tbody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 4: AVITO SYNC & EXTENSION ==================== -->
+  <section id="view-sync" class="hidden space-y-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-5 space-y-4">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">📥</span>
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">Импорт данных из браузера (Avito)</h3>
+            <p class="text-xs text-slate-600">Выберите, в какой профиль загрузить собранные объявления</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <label class="text-xs font-bold text-slate-700">Целевой профиль:</label>
+          <select id="sync-target-profile" onchange="toggleSyncSubSelect()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold bg-white">
+            <option value="p1">🔵 Авито 1 (общие лимиты)</option>
+            <option value="p2">🟣 Влада</option>
+          </select>
+          <select id="sync-sub-profile" class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold bg-white">
+            <option value="1">Подпрофиль 1 (основной)</option>
+            <option value="2">Подпрофиль 2 (связанный)</option>
+          </select>
+        </div>
+        <textarea id="avito-import-json" rows="6" placeholder='[{"date":"2026-11-18","title":"Куртка зимняя","cat1":"Личные вещи","cat2":"Одежда, обувь, аксессуары","cat3":"Женская одежда Верхняя одежда Отличное Зимние куртки и пуховики","type":"Новое объявление"}]' class="w-full border border-slate-300 rounded-xl p-3 text-xs font-mono bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 outline-none"></textarea>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <label class="flex items-center gap-2 text-xs text-slate-700 font-medium">
+            <input type="checkbox" id="sync-skip-duplicates" checked class="rounded text-sky-600">
+            Пропускать дубликаты в этом профиле
+          </label>
+          <button onclick="processAvitoJsonImport()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition">
+            Загрузить в трекер
+          </button>
+        </div>
+        <div id="sync-result-msg" class="text-xs font-bold hidden p-3 rounded-lg"></div>
+      </div>
+
+      <div class="card p-5 space-y-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🤖</span>
+          <div>
+            <h3 class="text-base font-extrabold">Скрипт-сборщик для кабинета Avito</h3>
+            <p class="text-xs text-indigo-200">Работает локально в открытом браузере для любого из ваших профилей</p>
+          </div>
+        </div>
+        <ol class="text-xs text-slate-200 space-y-2 list-decimal list-inside leading-relaxed">
+          <li>Откройте нужный профиль <strong>Avito → Мои объявления</strong> (вкладку «Активные»).</li>
+          <li>Нажмите <strong>F12</strong> (или Ctrl+Shift+I) → выберите вкладку <strong>Console (Консоль)</strong>.</li>
+          <li>Скопируйте код ниже, вставьте его в консоль и нажмите <strong>Enter</strong>.</li>
+          <li>Скрипт соберёт объявления и скопирует их в буфер обмена — вставьте их в окно слева и выберите профиль («Авито 1» или «Влада»)!</li>
+        </ol>
+        <div class="bg-slate-950/80 rounded-xl p-3 border border-indigo-700/50">
+          <pre id="scraper-code" class="text-[11px] text-emerald-400 overflow-x-auto font-mono leading-snug">(() => {
+  const items = [];
+  document.querySelectorAll('[data-marker*="item"]').forEach(el => {
+    const titleEl = el.querySelector('a[data-marker*="title"], h3, [class*="title"]');
+    const dateEl = el.querySelector('[data-marker*="date"], [class*="date"]');
+    if (titleEl && titleEl.innerText.trim().length > 2) {
+      items.push({
+        date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date()),
+        rawDate: dateEl ? dateEl.innerText.trim() : '',
+        title: titleEl.innerText.trim(),
+        cat1: '', cat2: '', cat3: '',
+        type: 'Новое объявление'
+      });
+    }
+  });
+  const unique = Array.from(new Map(items.map(i => [i.title, i])).values());
+  copy(JSON.stringify(unique, null, 2));
+  alert('Собрано объявлений: ' + unique.length + '. Данные скопированы в буфер обмена!');
+})();</pre>
+        </div>
+        <button onclick="copyScraperCode()" class="w-full bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs py-2.5 rounded-lg transition shadow-md">
+          📋 Скопировать код сборщика для консоли Avito
+        </button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ==================== MODAL: ADD / EDIT AD ==================== -->
+<div id="ad-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 id="modal-title" class="text-base font-extrabold text-slate-900">Новое объявление</h3>
+      <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+    </div>
+
+    <div class="space-y-3 text-xs">
+      <!-- Profile & Sub-profile (1 or 2) selection -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Аккаунт / Трекер *</label>
+          <select id="f-profile" onchange="onModalProfileChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-bold">
+            <option value="p1">🔵 Авито 1</option>
+            <option value="p2">🟣 Влада</option>
+          </select>
+        </div>
+
+        <div id="f-subprofile-wrap">
+          <label class="block font-bold text-slate-700 mb-1">Связанный профиль (1 или 2) *</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="sub-btn-1" onclick="setSubProfile('1')" class="py-2 px-3 rounded-lg border-2 border-sky-600 bg-sky-50 text-sky-900 font-extrabold text-center transition">
+              1 (Основной)
+            </button>
+            <button type="button" id="sub-btn-2" onclick="setSubProfile('2')" class="py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-600 font-bold text-center hover:bg-slate-50 transition">
+              2 (Связанный)
+            </button>
+          </div>
+          <input type="hidden" id="f-subprofile" value="1">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Дата публикации *</label>
+          <input type="date" id="f-date" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-medium">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Тип публикации *</label>
+          <select id="f-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium">
+            <option value="Новое объявление">Новое объявление</option>
+            <option value="Продление">Продление</option>
+            <option value="Переопубликация">Переопубликация</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Название объявления *</label>
+        <input type="text" id="f-title" placeholder="Например: Куртка зимняя детская" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-medium">
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Категория (Ур 1) *</label>
+        <select id="f-cat1" onchange="onCat1Change()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium"></select>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Подкатегория (Ур 2) *</label>
+        <select id="f-cat2" onchange="onCat2Change()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium"></select>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Под-подкатегория / уточнение (Ур 3)</label>
+        <select id="f-cat3" onchange="updateModalLimitPreview()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium"></select>
+      </div>
+
+      <!-- Live Limit Check Preview -->
+      <div id="modal-limit-preview" class="p-3 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 flex items-center justify-between">
+        <span>Выберите категорию для проверки лимита</span>
+      </div>
+
+      <!-- Sales Block with Dropdown "Где продано" -->
+      <div class="border-t border-slate-200 pt-3 bg-emerald-50/60 -mx-2 px-3 py-2.5 rounded-xl">
+        <p class="font-extrabold text-emerald-800 mb-2">💰 Информация о продаже (подсветит строку цветом площадки)</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Дата продажи</label>
+            <input type="date" id="f-sold-date" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white font-medium">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Сумма (₽)</label>
+            <input type="number" id="f-sold-sum" placeholder="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white font-bold">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Где продано</label>
+            <select id="f-where" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white font-bold">
+              <option value="Авито" selected>🟢 Авито</option>
+              <option value="ВБ">🟣 ВБ</option>
+              <option value="Телеграм">🔵 Телеграм</option>
+              <option value="Вацап">🌿 Вацап</option>
+              <option value="MAX">🟠 MAX (мах)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+      <button onclick="closeModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">Отмена</button>
+      <button onclick="saveAd()" class="px-5 py-2 text-xs font-extrabold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white rounded-lg shadow-sm">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL: INSTALL HELP ("На экран") ==================== -->
+<div id="install-help-modal" onclick="if(event.target===this)closeInstallHelpModal()" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="text-base font-extrabold text-slate-900">📱 Как установить приложение на экран</h3>
+      <button onclick="closeInstallHelpModal()" class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+    </div>
+    <div class="space-y-3 text-xs text-slate-700 leading-relaxed">
+      <div class="p-3 rounded-xl bg-sky-50 border border-sky-200">
+        <p class="font-extrabold text-sky-950 mb-1">🤖 Android (Google Chrome):</p>
+        <p>Нажмите кнопку <strong>«📲 Установить»</strong> в шапке (если она видна) или откройте меню браузера <strong>⋮</strong> (три точки в правом верхнем углу) → выберите <strong>«Добавить на гл. экран»</strong> / <strong>«Установить приложение»</strong>.</p>
+      </div>
+      <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+        <p class="font-extrabold text-indigo-950 mb-1">🍎 iPhone / iPad (Safari):</p>
+        <p>Откройте страницу в <strong>Safari</strong> → нажмите кнопку <strong>«Поделиться»</strong> (квадрат со стрелкой вверх внизу экрана) → пролистайте вниз и выберите <strong>«На экран „Домой“»</strong> → нажмите <strong>«Добавить»</strong>.</p>
+      </div>
+    </div>
+    <div class="flex justify-end pt-1">
+      <button onclick="closeInstallHelpModal()" class="px-5 py-2 text-xs font-extrabold bg-slate-900 hover:bg-slate-800 text-white rounded-lg">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="pwa-toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white border border-slate-700 px-4 py-2.5 rounded-full text-xs font-bold shadow-xl z-50 hidden"></div>
+
+<script>
+
+
+// PWA Install & Toast Helpers
+window.showPwaToast = function(msg) {
+  const el = document.getElementById('pwa-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(window.__pwaToastTimer);
+  window.__pwaToastTimer = setTimeout(() => {
+    el.classList.add('hidden');
+  }, 3200);
+};
+
+async function triggerPwaInstall() {
+  const promptEvent = window.__deferredInstallPrompt;
+  if (!promptEvent) {
+    openInstallHelpModal();
+    return;
+  }
+  try {
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    window.__deferredInstallPrompt = null;
+    if (choice && choice.outcome === 'accepted') {
+      const btn = document.getElementById('btn-pwa-install');
+      if (btn) btn.classList.add('hidden');
+      window.showPwaToast('📲 Установка приложения запущена...');
+    }
+  } catch (err) {
+    openInstallHelpModal();
+  }
+}
+
+function openInstallHelpModal() {
+  const m = document.getElementById('install-help-modal');
+  if (!m) return;
+  m.classList.remove('hidden');
+  m.classList.add('flex');
+}
+
+function closeInstallHelpModal() {
+  const m = document.getElementById('install-help-modal');
+  if (!m) return;
+  m.classList.add('hidden');
+  m.classList.remove('flex');
+}
+
+// Синхронизация видимости кнопки «Установить» при загрузке DOM, если событие сработало раньше
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.__deferredInstallPrompt) {
+    const btn = document.getElementById('btn-pwa-install');
+    if (btn) btn.classList.remove('hidden');
+  }
+});
+
+const RAW_DATA = {"s":["Бытовая электроника","Аудио и видео","MP3-плееры","Аксессуары","Акустика, колонки, сабвуферы","Видео, DVD и Blu-ray плееры","Видеокамеры","Кабели и адаптеры","Микрофоны","Музыка и фильмы","Музыкальные центры, магнитолы","Наушники","Телевизоры и проекторы","Усилители и ресиверы","Игры, приставки и программы","Игровые приставки и аксессуары","Игры для приставок |Компьютерные игры |Программы","Настольные компьютеры","Ноутбуки","Оргтехника и расходники","ИБП, сетевые фильтры","Канцелярия","МФУ, копиры и сканеры","Принтеры","Расходные материалы","Телефония","Уничтожители бумаг","Остальные подкатегории «Оргтехника и расходники»","Планшеты и электронные книги","Телефоны","Остальные подкатегории","Мобильные телефоны","Товары для компьютера","Акустика","Веб-камеры","Джойстики и рули","Клавиатуры и мыши","Комплектующие","Мониторы и запчасти","Переносные жёсткие диски","Сетевое оборудование","ТВ-тюнеры","Флэшки и карты памяти","Фототехника","Бинокли и телескопы","Зеркальные фотоаппараты","Компактные фотоаппараты","Оборудование и аксессуары","Объективы","Плёночные фотоаппараты","Для дома и дачи","Бытовая техника","Для дома","Для индивидуального ухода","Для кухни","Другое","Климатическое оборудование","Остальные подкатегории в «Бытовой технике»","Мебель и интерьер","Компьютерные столы и кресла","Кровати, диваны и кресла","Кухонные гарнитуры","Подставки и тумбы","Шкафы, комоды и стеллажи","Столы и стулья","Освещение","Предметы интерьера, искусство","Остальные подкатегории в «Мебель и интерьер»","Текстиль и ковры","Посуда и товары для кухни","Продукты питания","Растения","Ремонт и строительство","Ворота, заборы и ограждения","Готовые строения и срубы","Двери","Для сада и дачи","Инструменты","Камины и обогреватели","Окна и балконы","Потолки","Сантехника, водоснабжение и сауна","Стройматериалы","Животные","Аквариум","Другие животные","Амфибии","Грызуны","Кролики","Лошади","Рептилии","С/х животные","Хорьки","Кошки","Отдаю даром","Продаю как частное лицо","Птицы","Собаки","Товары для животных","Личные вещи","Детская одежда и обувь","Для девочек Аксессуары","Для девочек Аксессуары Головные уборы","Для девочек Аксессуары Носки и колготки","Для девочек Аксессуары Перчатки и шарфы","Для девочек Аксессуары Сумки и рюкзаки","Для девочек Аксессуары Украшения и аксессуары","Для девочек Бельё и домашняя одежда","Для девочек Бельё и домашняя одежда Домашняя одежда","Для девочек Бельё и домашняя одежда Нижнее бельё","Для девочек Блузки и рубашки","Для девочек Брюки и шорты","Для девочек Брюки и шорты Брюки","Для девочек Брюки и шорты Джинсы","Для девочек Брюки и шорты Легинсы","Для девочек Брюки и шорты Шорты","Для девочек Верхняя одежда","Для девочек Верхняя одежда Дублёнки и шубы","Для девочек Верхняя одежда Жилеты","Для девочек Верхняя одежда Куртки и пуховики","Для девочек Верхняя одежда Пальто и плащи","Для девочек Другое","Для девочек Комбинезоны","Для девочек Комбинезоны Нательные комбинезоны","Для девочек Комбинезоны Утеплённые комбинезоны","Для девочек Обувь","Для девочек Обувь Ботинки и полуботинки","Для девочек Обувь Валенки и угги","Для девочек Обувь Домашняя обувь","Для девочек Обувь Кроссовки и кеды","Для девочек Обувь Сандалии и сланцы","Для девочек Обувь Сапоги и полусапоги","Для девочек Обувь Спортивная обувь","Для девочек Обувь Туфли и босоножки","Для девочек Пиджаки и костюмы","Для девочек Платья и юбки","Для девочек Платья и юбки Платья","Для девочек Платья и юбки Юбки","Для девочек Пляжная одежда","Для девочек Свитеры и толстовки","Для девочек Свитеры и толстовки Кофты","Для девочек Свитеры и толстовки Свитеры","Для девочек Свитеры и толстовки Толстовки","Для девочек Футболки и топы","Для девочек Футболки и топы Майки и топы","Для девочек Футболки и топы Футболки","Для мальчиков Аксессуары","Для мальчиков Бельё и домашняя одежда","Для мальчиков Бельё и домашняя одежда Домашняя одежда","Для мальчиков Бельё и домашняя одежда Нижнее бельё","Для мальчиков Брюки и шорты","Для мальчиков Брюки и шорты Брюки","Для мальчиков Брюки и шорты Джинсы","Для мальчиков Брюки и шорты Шорты","Для мальчиков Верхняя одежда","Для мальчиков Верхняя одежда Дублёнки и шубы","Для мальчиков Верхняя одежда Жилеты","Для мальчиков Верхняя одежда Куртки и пуховики","Для мальчиков Верхняя одежда Пальто и плащи","Для мальчиков Другое","Для мальчиков Комбинезоны","Для мальчиков Комбинезоны Нательные комбинезоны","Для мальчиков Комбинезоны Утеплённые комбинезоны","Для мальчиков Обувь","Для мальчиков Обувь Ботинки и туфли","Для мальчиков Обувь Валенки и угги","Для мальчиков Обувь Домашняя обувь","Для мальчиков Обувь Кроссовки и кеды","Для мальчиков Обувь Сандалии и сланцы","Для мальчиков Обувь Сапоги и полусапоги","Для мальчиков Обувь Спортивная обувь","Для мальчиков Пиджаки и костюмы","Для мальчиков Пиджаки и костюмы Костюмы","Для мальчиков Пиджаки и костюмы Пиджаки","Для мальчиков Пляжная одежда","Для мальчиков Рубашки","Для мальчиков Свитеры и толстовки","Для мальчиков Свитеры и толстовки Кофты","Для мальчиков Свитеры и толстовки Свитеры","Для мальчиков Свитеры и толстовки Толстовки","Для мальчиков Футболки и майки","Красота и здоровье","Другое Биологически активные добавки","Другое Макияж и маникюр","Другое Парфюмерия","Другое Приборы и аксессуары","Другое Средства для волос","Другое Уход и гигиена","Медицинские изделия","Одежда, обувь, аксессуары","Аксессуары Аксессуары для волос","Аксессуары Галстуки и бабочки","Аксессуары Головные уборы","Аксессуары Другое","Аксессуары Зонты","Аксессуары Носки, чулки, колготки","Аксессуары Очки","Аксессуары Перчатки и варежки","Аксессуары Платки и шарфы","Аксессуары Ремни, пояса, подтяжки","Аксессуары Украшения","Аксессуары Швейная фурнитура","Женская обувь Новое с биркой Балетки","Женская обувь Новое с биркой Босоножки","Женская обувь Новое с биркой Ботильоны","Женская обувь Новое с биркой Ботинки и полуботинки","Женская обувь Новое с биркой Домашняя обувь","Женская обувь Новое с биркой Кроссовки и кеды","Женская обувь Новое с биркой Мокасины и лоферы","Женская обувь Новое с биркой Полусапоги","Женская обувь Новое с биркой Резиновая обувь","Женская обувь Новое с биркой Сабо и мюли","Женская обувь Новое с биркой Сандалии","Женская обувь Новое с биркой Сапоги","Женская обувь Новое с биркой Слипоны и эспадрильи","Женская обувь Новое с биркой Спортивная обувь","Женская обувь Новое с биркой Туфли","Женская обувь Новое с биркой Угги, валенки, дутики","Женская обувь Новое с биркой Уход за обувью","Женская обувь Новое с биркой Шлёпанцы и сланцы","Женская обувь Отличное Балетки","Женская обувь Отличное Босоножки","Женская обувь Отличное Ботильоны","Женская обувь Отличное Ботинки и полуботинки","Женская обувь Отличное Домашняя обувь","Женская обувь Отличное Кроссовки и кеды","Женская обувь Отличное Мокасины и лоферы","Женская обувь Отличное Полусапоги","Женская обувь Отличное Резиновая обувь","Женская обувь Отличное Сабо и мюли","Женская обувь Отличное Сандалии","Женская обувь Отличное Сапоги","Женская обувь Отличное Слипоны и эспадрильи","Женская обувь Отличное Спортивная обувь","Женская обувь Отличное Туфли","Женская обувь Отличное Угги, валенки, дутики","Женская обувь Отличное Уход за обувью","Женская обувь Отличное Шлёпанцы и сланцы","Женская обувь Удовлетворительное Балетки","Женская обувь Удовлетворительное Босоножки","Женская обувь Удовлетворительное Ботильоны","Женская обувь Удовлетворительное Ботинки и полуботинки","Женская обувь Удовлетворительное Домашняя обувь","Женская обувь Удовлетворительное Кроссовки и кеды","Женская обувь Удовлетворительное Мокасины и лоферы","Женская обувь Удовлетворительное Полусапоги","Женская обувь Удовлетворительное Резиновая обувь","Женская обувь Удовлетворительное Сабо и мюли","Женская обувь Удовлетворительное Сандалии","Женская обувь Удовлетворительное Сапоги","Женская обувь Удовлетворительное Слипоны и эспадрильи","Женская обувь Удовлетворительное Спортивная обувь","Женская обувь Удовлетворительное Туфли","Женская обувь Удовлетворительное Угги, валенки, дутики","Женская обувь Удовлетворительное Уход за обувью","Женская обувь Удовлетворительное Шлёпанцы и сланцы","Женская обувь Хорошее Балетки","Женская обувь Хорошее Босоножки","Женская обувь Хорошее Ботильоны","Женская обувь Хорошее Ботинки и полуботинки","Женская обувь Хорошее Домашняя обувь","Женская обувь Хорошее Кроссовки и кеды","Женская обувь Хорошее Мокасины и лоферы","Женская обувь Хорошее Полусапоги","Женская обувь Хорошее Резиновая обувь","Женская обувь Хорошее Сабо и мюли","Женская обувь Хорошее Сандалии","Женская обувь Хорошее Сапоги","Женская обувь Хорошее Слипоны и эспадрильи","Женская обувь Хорошее Спортивная обувь","Женская обувь Хорошее Туфли","Женская обувь Хорошее Угги, валенки, дутики","Женская обувь Хорошее Уход за обувью","Женская обувь Хорошее Шлёпанцы и сланцы","Женская одежда Брюки","Женская одежда Верхняя одежда","Женская одежда Верхняя одежда Новое с биркой","Женская одежда Верхняя одежда Новое с биркой Анораки","Женская одежда Верхняя одежда Новое с биркой Бомберы","Женская одежда Верхняя одежда Новое с биркой Демисезонные куртки","Женская одежда Верхняя одежда Новое с биркой Джинсовые куртки","Женская одежда Верхняя одежда Новое с биркой Другое","Женская одежда Верхняя одежда Новое с биркой Дублёнки","Женская одежда Верхняя одежда Новое с биркой Жилеты","Женская одежда Верхняя одежда Новое с биркой Зимние куртки и пуховики","Женская одежда Верхняя одежда Новое с биркой Кожаные куртки","Женская одежда Верхняя одежда Новое с биркой Косухи","Женская одежда Верхняя одежда Новое с биркой Лёгкие куртки и ветровки","Женская одежда Верхняя одежда Новое с биркой Пальто","Женская одежда Верхняя одежда Новое с биркой Парки","Женская одежда Верхняя одежда Новое с биркой Плащи и тренчи","Женская одежда Верхняя одежда Новое с биркой Пончо","Женская одежда Верхняя одежда Новое с биркой Шубы","Женская одежда Верхняя одежда Отличное","Женская одежда Верхняя одежда Отличное Анораки","Женская одежда Верхняя одежда Отличное Бомберы","Женская одежда Верхняя одежда Отличное Демисезонные куртки","Женская одежда Верхняя одежда Отличное Джинсовые куртки","Женская одежда Верхняя одежда Отличное Другое","Женская одежда Верхняя одежда Отличное Дублёнки","Женская одежда Верхняя одежда Отличное Жилеты","Женская одежда Верхняя одежда Отличное Зимние куртки и пуховики","Женская одежда Верхняя одежда Отличное Кожаные куртки","Женская одежда Верхняя одежда Отличное Косухи","Женская одежда Верхняя одежда Отличное Лёгкие куртки и ветровки","Женская одежда Верхняя одежда Отличное Пальто","Женская одежда Верхняя одежда Отличное Парки","Женская одежда Верхняя одежда Отличное Плащи и тренчи","Женская одежда Верхняя одежда Отличное Пончо","Женская одежда Верхняя одежда Отличное Шубы","Женская одежда Верхняя одежда Удовлетворительное","Женская одежда Верхняя одежда Удовлетворительное Анораки","Женская одежда Верхняя одежда Удовлетворительное Бомберы","Женская одежда Верхняя одежда Удовлетворительное Демисезонные куртки","Женская одежда Верхняя одежда Удовлетворительное Джинсовые куртки","Женская одежда Верхняя одежда Удовлетворительное Другое","Женская одежда Верхняя одежда Удовлетворительное Дублёнки","Женская одежда Верхняя одежда Удовлетворительное Жилеты","Женская одежда Верхняя одежда Удовлетворительное Зимние куртки и пуховики","Женская одежда Верхняя одежда Удовлетворительное Кожаные куртки","Женская одежда Верхняя одежда Удовлетворительное Косухи","Женская одежда Верхняя одежда Удовлетворительное Лёгкие куртки и ветровки","Женская одежда Верхняя одежда Удовлетворительное Пальто","Женская одежда Верхняя одежда Удовлетворительное Парки","Женская одежда Верхняя одежда Удовлетворительное Плащи и тренчи","Женская одежда Верхняя одежда Удовлетворительное Пончо","Женская одежда Верхняя одежда Удовлетворительное Шубы","Женская одежда Верхняя одежда Хорошее","Женская одежда Верхняя одежда Хорошее Анораки","Женская одежда Верхняя одежда Хорошее Бомберы","Женская одежда Верхняя одежда Хорошее Демисезонные куртки","Женская одежда Верхняя одежда Хорошее Джинсовые куртки","Женская одежда Верхняя одежда Хорошее Другое","Женская одежда Верхняя одежда Хорошее Дублёнки","Женская одежда Верхняя одежда Хорошее Жилеты","Женская одежда Верхняя одежда Хорошее Зимние куртки и пуховики","Женская одежда Верхняя одежда Хорошее Кожаные куртки","Женская одежда Верхняя одежда Хорошее Косухи","Женская одежда Верхняя одежда Хорошее Лёгкие куртки и ветровки","Женская одежда Верхняя одежда Хорошее Пальто","Женская одежда Верхняя одежда Хорошее Парки","Женская одежда Верхняя одежда Хорошее Плащи и тренчи","Женская одежда Верхняя одежда Хорошее Пончо","Женская одежда Верхняя одежда Хорошее Шубы","Женская одежда Джемперы, свитеры, кардиганы","Женская одежда Джинсы","Женская одежда Другое","Женская одежда Купальники","Женская одежда Нижнее бельё","Женская одежда Пиджаки и костюмы","Женская одежда Платья","Женская одежда Платья Вечерние","Женская одежда Платья Повседневные","Женская одежда Платья Сарафаны","Женская одежда Рубашки и блузки","Женская одежда Свадебные платья","Женская одежда Толстовки и свитшоты","Женская одежда Топы и футболки","Женская одежда Юбки","Мужская обувь Новое с биркой Ботинки и полуботинки","Мужская обувь Новое с биркой Домашняя обувь","Мужская обувь Новое с биркой Кеды","Мужская обувь Новое с биркой Кроссовки","Мужская обувь Новое с биркой Мокасины и лоферы","Мужская обувь Новое с биркой Рабочая обувь","Мужская обувь Новое с биркой Резиновая обувь","Мужская обувь Новое с биркой Сандалии","Мужская обувь Новое с биркой Сапоги и полусапоги","Мужская обувь Новое с биркой Слипоны и эспадрильи","Мужская обувь Новое с биркой Спортивная обувь","Мужская обувь Новое с биркой Туфли","Мужская обувь Новое с биркой Угги, валенки, дутики","Мужская обувь Новое с биркой Уход за обувью","Мужская обувь Новое с биркой Шлёпанцы и сланцы","Мужская обувь Отличное Ботинки и полуботинки","Мужская обувь Отличное Домашняя обувь","Мужская обувь Отличное Кеды","Мужская обувь Отличное Кроссовки","Мужская обувь Отличное Мокасины и лоферы","Мужская обувь Отличное Рабочая обувь","Мужская обувь Отличное Резиновая обувь","Мужская обувь Отличное Сандалии","Мужская обувь Отличное Сапоги и полусапоги","Мужская обувь Отличное Слипоны и эспадрильи","Мужская обувь Отличное Спортивная обувь","Мужская обувь Отличное Туфли","Мужская обувь Отличное Угги, валенки, дутики","Мужская обувь Отличное Уход за обувью","Мужская обувь Отличное Шлёпанцы и сланцы","Мужская обувь Удовлетворительное","Мужская обувь Удовлетворительное Ботинки и полуботинки","Мужская обувь Удовлетворительное Домашняя обувь","Мужская обувь Удовлетворительное Кеды","Мужская обувь Удовлетворительное Кроссовки","Мужская обувь Удовлетворительное Мокасины и лоферы","Мужская обувь Удовлетворительное Рабочая обувь","Мужская обувь Удовлетворительное Резиновая обувь","Мужская обувь Удовлетворительное Сандалии","Мужская обувь Удовлетворительное Сапоги и полусапоги","Мужская обувь Удовлетворительное Слипоны и эспадрильи","Мужская обувь Удовлетворительное Спортивная обувь","Мужская обувь Удовлетворительное Туфли","Мужская обувь Удовлетворительное Угги, валенки, дутики","Мужская обувь Удовлетворительное Уход за обувью","Мужская обувь Удовлетворительное Шлёпанцы и сланцы","Мужская обувь Хорошее Ботинки и полуботинки","Мужская обувь Хорошее Домашняя обувь","Мужская обувь Хорошее Кеды","Мужская обувь Хорошее Кроссовки","Мужская обувь Хорошее Мокасины и лоферы","Мужская обувь Хорошее Рабочая обувь","Мужская обувь Хорошее Резиновая обувь","Мужская обувь Хорошее Сандалии","Мужская обувь Хорошее Сапоги и полусапоги","Мужская обувь Хорошее Слипоны и эспадрильи","Мужская обувь Хорошее Спортивная обувь","Мужская обувь Хорошее Туфли","Мужская обувь Хорошее Угги, валенки, дутики","Мужская обувь Хорошее Уход за обувью","Мужская обувь Хорошее Шлёпанцы и сланцы","Мужская одежда Брюки","Мужская одежда Верхняя одежда","Мужская одежда Верхняя одежда Анораки","Мужская одежда Верхняя одежда Анораки Новое с биркой","Мужская одежда Верхняя одежда Анораки Отличное","Мужская одежда Верхняя одежда Анораки Удовлетворительное","Мужская одежда Верхняя одежда Анораки Хорошее","Мужская одежда Верхняя одежда Бомберы","Мужская одежда Верхняя одежда Бомберы Новое с биркой","Мужская одежда Верхняя одежда Бомберы Отличное","Мужская одежда Верхняя одежда Бомберы Удовлетворительное","Мужская одежда Верхняя одежда Бомберы Хорошее","Мужская одежда Верхняя одежда Демисезонные куртки","Мужская одежда Верхняя одежда Демисезонные куртки Новое с биркой","Мужская одежда Верхняя одежда Демисезонные куртки Отличное","Мужская одежда Верхняя одежда Демисезонные куртки Удовлетворительное","Мужская одежда Верхняя одежда Демисезонные куртки Хорошее","Мужская одежда Верхняя одежда Джинсовые куртки","Мужская одежда Верхняя одежда Джинсовые куртки Новое с биркой","Мужская одежда Верхняя одежда Джинсовые куртки Отличное","Мужская одежда Верхняя одежда Джинсовые куртки Удовлетворительное","Мужская одежда Верхняя одежда Джинсовые куртки Хорошее","Мужская одежда Верхняя одежда Другое","Мужская одежда Верхняя одежда Другое Новое с биркой","Мужская одежда Верхняя одежда Другое Отличное","Мужская одежда Верхняя одежда Другое Удовлетворительное","Мужская одежда Верхняя одежда Другое Хорошее","Мужская одежда Верхняя одежда Дублёнки и шубы","Мужская одежда Верхняя одежда Дублёнки и шубы Новое с биркой","Мужская одежда Верхняя одежда Дублёнки и шубы Отличное","Мужская одежда Верхняя одежда Дублёнки и шубы Удовлетворительное","Мужская одежда Верхняя одежда Дублёнки и шубы Хорошее","Мужская одежда Верхняя одежда Жилеты","Мужская одежда Верхняя одежда Жилеты Новое с биркой","Мужская одежда Верхняя одежда Жилеты Отличное","Мужская одежда Верхняя одежда Жилеты Удовлетворительное","Мужская одежда Верхняя одежда Жилеты Хорошее","Мужская одежда Верхняя одежда Зимние куртки и пуховики","Мужская одежда Верхняя одежда Зимние куртки и пуховики Новое с биркой","Мужская одежда Верхняя одежда Зимние куртки и пуховики Отличное","Мужская одежда Верхняя одежда Зимние куртки и пуховики Удовлетворительное","Мужская одежда Верхняя одежда Зимние куртки и пуховики Хорошее","Мужская одежда Верхняя одежда Кожаные куртки","Мужская одежда Верхняя одежда Кожаные куртки Новое с биркой","Мужская одежда Верхняя одежда Кожаные куртки Отличное","Мужская одежда Верхняя одежда Кожаные куртки Удовлетворительное","Мужская одежда Верхняя одежда Кожаные куртки Хорошее","Мужская одежда Верхняя одежда Косухи","Мужская одежда Верхняя одежда Косухи Новое с биркой","Мужская одежда Верхняя одежда Косухи Отличное","Мужская одежда Верхняя одежда Косухи Удовлетворительное","Мужская одежда Верхняя одежда Косухи Хорошее","Мужская одежда Верхняя одежда Лёгкие куртки и ветровки","Мужская одежда Верхняя одежда Лёгкие куртки и ветровки Новое с биркой","Мужская одежда Верхняя одежда Лёгкие куртки и ветровки Отличное","Мужская одежда Верхняя одежда Лёгкие куртки и ветровки Удовлетворительное","Мужская одежда Верхняя одежда Лёгкие куртки и ветровки Хорошее","Мужская одежда Верхняя одежда Пальто","Мужская одежда Верхняя одежда Пальто Новое с биркой","Мужская одежда Верхняя одежда Пальто Отличное","Мужская одежда Верхняя одежда Пальто Удовлетворительное","Мужская одежда Верхняя одежда Пальто Хорошее","Мужская одежда Верхняя одежда Парки","Мужская одежда Верхняя одежда Парки Новое с биркой","Мужская одежда Верхняя одежда Парки Отличное","Мужская одежда Верхняя одежда Парки Удовлетворительное","Мужская одежда Верхняя одежда Парки Хорошее","Мужская одежда Верхняя одежда Плащи и тренчи","Мужская одежда Верхняя одежда Плащи и тренчи Новое с биркой","Мужская одежда Верхняя одежда Плащи и тренчи Отличное","Мужская одежда Верхняя одежда Плащи и тренчи Удовлетворительное","Мужская одежда Верхняя одежда Плащи и тренчи Хорошее","Мужская одежда Джинсы","Мужская одежда Другое","Мужская одежда Кофты и футболки","Мужская одежда Нижнее бельё","Мужская одежда Пиджаки и костюмы","Мужская одежда Рубашки","Мужская одежда Спортивные костюмы","Мужская одежда Шорты","Сумки, рюкзаки и чемоданы","Сумки, рюкзаки и чемоданы Новое с биркой","Сумки, рюкзаки и чемоданы Новое с биркой Косметички и бьюти–кейсы","Сумки, рюкзаки и чемоданы Новое с биркой Кошельки, визитницы, ключницы","Сумки, рюкзаки и чемоданы Новое с биркой Портфели и борсетки","Сумки, рюкзаки и чемоданы Новое с биркой Рюкзаки","Сумки, рюкзаки и чемоданы Новое с биркой Сумки","Сумки, рюкзаки и чемоданы Новое с биркой Чемоданы и дорожные сумки","Сумки, рюкзаки и чемоданы Отличное","Сумки, рюкзаки и чемоданы Отличное Косметички и бьюти–кейсы","Сумки, рюкзаки и чемоданы Отличное Кошельки, визитницы, ключницы","Сумки, рюкзаки и чемоданы Отличное Портфели и борсетки","Сумки, рюкзаки и чемоданы Отличное Рюкзаки","Сумки, рюкзаки и чемоданы Отличное Сумки","Сумки, рюкзаки и чемоданы Отличное Чемоданы и дорожные сумки","Сумки, рюкзаки и чемоданы Удовлетворительное","Сумки, рюкзаки и чемоданы Удовлетворительное Косметички и бьюти–кейсы","Сумки, рюкзаки и чемоданы Удовлетворительное Кошельки, визитницы, ключницы","Сумки, рюкзаки и чемоданы Удовлетворительное Портфели и борсетки","Сумки, рюкзаки и чемоданы Удовлетворительное Рюкзаки","Сумки, рюкзаки и чемоданы Удовлетворительное Сумки","Сумки, рюкзаки и чемоданы Удовлетворительное Чемоданы и дорожные сумки","Сумки, рюкзаки и чемоданы Хорошее","Сумки, рюкзаки и чемоданы Хорошее Косметички и бьюти–кейсы","Сумки, рюкзаки и чемоданы Хорошее Кошельки, визитницы, ключницы","Сумки, рюкзаки и чемоданы Хорошее Портфели и борсетки","Сумки, рюкзаки и чемоданы Хорошее Рюкзаки","Сумки, рюкзаки и чемоданы Хорошее Сумки","Сумки, рюкзаки и чемоданы Хорошее Чемоданы и дорожные сумки","Товары для детей и игрушки","Часы и украшения","Транспорт","Запчасти и аксессуары","Аксессуары, оборудование и автохимия GPS-навигаторы","Аксессуары, оборудование и автохимия Аксессуары","Аксессуары, оборудование и автохимия Аудио- и видеотехника","Аксессуары, оборудование и автохимия Багажники и фаркопы","Аксессуары, оборудование и автохимия Инструменты","Аксессуары, оборудование и автохимия Масла и автохимия","Аксессуары, оборудование и автохимия Прицепы","Аксессуары, оборудование и автохимия Противоугонные устройства Автосигнализации","Аксессуары, оборудование и автохимия Противоугонные устройства Иммобилайзеры","Аксессуары, оборудование и автохимия Противоугонные устройства Механические блокираторы","Аксессуары, оборудование и автохимия Противоугонные устройства Спутниковые системы","Аксессуары, оборудование и автохимия Экипировка","Запчасти Для автомобилей Автозапчасти: двигатель и трансмиссия Двигатель","Запчасти Для автомобилей Автозапчасти: двигатель и трансмиссия Трансмиссия и привод","Запчасти Для автомобилей Автозапчасти: Кузов","Запчасти Для автомобилей Автозапчасти: основные Автосвет","Запчасти Для автомобилей Автозапчасти: основные Аккумуляторы","Запчасти Для автомобилей Автозапчасти: основные Подвеска","Запчасти Для автомобилей Автозапчасти: основные Рулевое управление","Запчасти Для автомобилей Автозапчасти: основные Салон","Запчасти Для автомобилей Автозапчасти: основные Система охлаждения","Запчасти Для автомобилей Автозапчасти: основные Стекла","Запчасти Для автомобилей Автозапчасти: основные Топливная и выхлопная системы","Запчасти Для автомобилей Автозапчасти: основные Тормозная система","Запчасти Для автомобилей Автозапчасти: основные Электрооборудование","Запчасти Для автомобилей Автомобиль на запчасти","Запчасти Запчасти для прочего транспорта Для водного транспорта","Запчасти Запчасти для прочего транспорта Для грузовиков и спецтехники","Запчасти Запчасти для прочего транспорта Для мототехники","Шины, диски и колёса","Шины, диски и колёса Диски и колёса в сборе Диски","Шины, диски и колёса Диски и колёса в сборе Колёса","Шины, диски и колпаки Колпаки","Шины, диски и колпаки Мотошины","Шины, диски и колпаки Шины для грузовиков и спецтехники","Хобби и отдых","Билеты и путешествия","Карты, купоны","Концерты","Путешествия","Спорт","Театр, опера, балет","Цирк, кино","Шоу, мюзикл","Велосипеды","Книги и журналы","Журналы, газеты, брошюры","Книги","Книги Антикварные издания","Книги Книги для детей","Книги Книги на иностранных языках","Книги Комиксы и манга","Книги Нехудожественная литература","Книги Учебная литература","Книги Художественная литература","Коллекционирование","Банкноты","Билеты","Вещи знаменитостей, автографы","Военные вещи","Грампластинки","Документы","Жетоны, медали, значки","Игры","Календари","Картины","Киндер-сюрприз","Конверты и почтовые карточки","Макеты оружия","Марки","Модели, фигурки, куклы","Монеты","Открытки","Пепельницы, зажигалки","Пластиковые карточки","Спортивные карточки","Фотографии, письма","Этикетки, бутылки, пробки","Музыкальные инструменты","Охота и рыбалка","Спорт и отдых","Бег","Бильярд и боулинг","Бильярд и боулинг Бильярд","Бильярд и боулинг Боулинг","Гимнастика и танцы","Дайвинг и водный спорт","Дайвинг и водный спорт Аксессуары для плавания","Дайвинг и водный спорт Бассейны и комплектующие","Дайвинг и водный спорт Вёсельные лодки","Дайвинг и водный спорт Гидрокостюмы","Дайвинг и водный спорт Инвентарь для водного спорта","Дайвинг и водный спорт Сёрфы и сапборды","Единоборства","Зимний спорт","Зимний спорт Аксессуары и запчасти","Зимний спорт Лыжи и сноуборды","Зимний спорт Сани, снегокаты и тюбинги","Зимний спорт Фигурное катание","Зимний спорт Хоккей","Игры с мячом","Конный спорт","Награды и кубки","Настольные и карточные игры","Ролики и скейтбординг","Ролики и скейтбординг Защита","Ролики и скейтбординг Лыжероллеры","Ролики и скейтбординг Ролики","Ролики и скейтбординг Скейтбординг","Ролики и скейтбординг Шлемы","Самокаты и гироскутеры","Спортивное питание","Стрелковый спорт","Теннис и бадминтон","Товары для отдыха","Товары для отдыха Аксессуары для бани","Товары для отдыха Аксессуары для фототехники","Товары для отдыха Активные виды отдыха","Товары для отдыха Другое","Товары для отдыха Луки и арбалеты","Товары для отдыха Мангальные зоны","Товары для отдыха Товары для праздников","Товары для отдыха Туризм и отдых на природе","Товары для отдыха Фитнес и тренажёры","Товары для отдыха Фототехника","Товары для отдыха Хобби и творчество","Товары для отдыха Электротранспорт","Туризм и отдых на природе","Фитнес и тренажёры","Фитнес и тренажёры Аксессуары для фитнеса","Фитнес и тренажёры Батуты","Фитнес и тренажёры Детские спорткомплексы","Фитнес и тренажёры Кардиотренажёры","Фитнес и тренажёры Карты и абонементы","Фитнес и тренажёры Силовые тренажёры и инвентарь",""],"t":{"0":{"1":{"g":0,"i":0,"s":[[2,10],[3,10],[4,2],[5,10],[6,2],[7,10],[8,10],[9,10],[10,2],[11,10],[12,1],[13,2]]},"14":{"g":0,"i":0,"s":[[15,1],[16,10]]},"17":{"g":0,"i":1,"s":[]},"18":{"g":0,"i":2,"s":[]},"19":{"g":0,"i":0,"s":[[20,2],[21,4],[22,2],[23,2],[24,5],[25,3],[26,2],[27,10]]},"28":{"g":0,"i":10,"s":[]},"29":{"g":0,"i":3,"s":[[30,3],[31,1]]},"32":{"g":0,"i":0,"s":[[3,10],[33,10],[34,10],[35,10],[36,10],[37,5],[38,2],[39,10],[40,2],[41,10],[42,10]]},"43":{"g":0,"i":0,"s":[[44,10],[45,1],[46,10],[47,3],[48,3],[49,1]]}},"50":{"51":{"g":0,"i":0,"s":[[52,2],[53,2],[54,2],[55,1],[56,2],[57,3]]},"58":{"g":0,"i":0,"s":[[55,1],[59,2],[60,2],[61,1],[62,2],[63,2],[64,4],[65,3],[66,5],[67,3],[68,4]]},"69":{"g":10,"i":0,"s":[]},"70":{"g":0,"i":0,"s":[]},"71":{"g":10,"i":0,"s":[]},"72":{"g":0,"i":0,"s":[[73,1],[74,0],[75,1],[76,1],[77,1],[78,1],[79,1],[80,0],[81,1],[82,1]]}},"83":{"84":{"g":2,"i":0,"s":[]},"85":{"g":0,"i":0,"s":[[86,2],[87,2],[88,2],[89,1],[90,2],[91,1],[92,2],[55,1]]},"93":{"g":0,"i":0,"s":[[94,100],[95,3]]},"96":{"g":2,"i":0,"s":[]},"97":{"g":0,"i":0,"s":[[94,100],[95,3]]},"98":{"g":0,"i":2,"s":[]}},"99":{"100":{"g":20,"i":0,"s":[[101,5],[102,5],[103,5],[104,5],[105,5],[106,5],[107,5],[108,5],[109,5],[110,5],[111,5],[112,5],[113,5],[114,5],[115,5],[116,6],[117,6],[118,6],[119,6],[120,6],[121,5],[122,6],[123,6],[124,6],[125,7],[126,7],[127,7],[128,7],[129,7],[130,7],[131,7],[132,7],[133,7],[134,5],[135,7],[136,7],[137,7],[138,5],[139,5],[140,5],[141,5],[142,5],[143,5],[144,5],[145,5],[146,5],[147,5],[148,5],[149,5],[150,5],[151,5],[152,5],[153,5],[154,5],[155,5],[156,5],[157,5],[158,5],[159,5],[160,5],[161,5],[162,5],[163,7],[164,7],[165,7],[166,7],[167,7],[168,7],[169,7],[170,7],[171,5],[172,5],[173,5],[174,5],[175,5],[176,5],[177,5],[178,5],[179,5],[180,5]]},"181":{"g":10,"i":0,"s":[[182,1],[183,5],[184,7],[185,3],[186,4],[187,5],[188,3]]},"189":{"g":20,"i":0,"s":[[190,4],[191,3],[192,3],[193,3],[194,2],[195,4],[196,3],[197,3],[198,3],[199,3],[200,4],[201,5],[202,2],[203,2],[204,2],[205,3],[206,3],[207,3],[208,2],[209,2],[210,2],[211,2],[212,2],[213,2],[214,2],[215,2],[216,2],[217,3],[218,2],[219,2],[220,2],[221,2],[222,2],[223,2],[224,2],[225,2],[226,2],[227,2],[228,1],[229,2],[230,2],[231,2],[232,1],[233,1],[234,3],[235,2],[236,1],[237,2],[238,1],[239,2],[240,2],[241,2],[242,1],[243,2],[244,1],[245,1],[246,1],[247,1],[248,1],[249,2],[250,1],[251,1],[252,2],[253,1],[254,2],[255,1],[256,2],[257,2],[258,2],[259,2],[260,1],[261,2],[262,2],[263,2],[264,1],[265,2],[266,1],[267,2],[268,1],[269,2],[270,2],[271,2],[272,1],[273,2],[274,3],[275,7],[276,7],[277,7],[278,7],[279,7],[280,7],[281,7],[282,7],[283,7],[284,7],[285,7],[286,7],[287,7],[288,7],[289,7],[290,7],[291,7],[292,7],[293,7],[294,7],[295,7],[296,7],[297,7],[298,7],[299,7],[300,7],[301,7],[302,7],[303,7],[304,7],[305,7],[306,7],[307,7],[308,7],[309,7],[310,7],[311,7],[312,7],[313,7],[314,7],[315,7],[316,7],[317,7],[318,7],[319,7],[320,7],[321,7],[322,7],[323,7],[324,7],[325,7],[326,7],[327,7],[328,7],[329,7],[330,7],[331,7],[332,7],[333,7],[334,7],[335,7],[336,7],[337,7],[338,7],[339,7],[340,7],[341,7],[342,7],[343,7],[344,4],[345,3],[346,3],[347,3],[348,4],[349,3],[350,7],[351,7],[352,7],[353,7],[354,4],[355,2],[356,3],[357,4],[358,3],[359,3],[360,2],[361,3],[362,5],[363,2],[364,3],[365,2],[366,2],[367,2],[368,2],[369,3],[370,2],[371,2],[372,2],[373,2],[374,2],[375,2],[376,2],[377,3],[378,2],[379,2],[380,1],[381,1],[382,2],[383,1],[384,2],[385,2],[386,2],[387,2],[388,1],[389,0],[390,2],[391,1],[392,2],[393,2],[394,2],[395,1],[396,1],[397,1],[398,1],[399,1],[400,2],[401,2],[402,1],[403,2],[404,1],[405,2],[406,1],[407,2],[408,2],[409,2],[410,2],[411,1],[412,1],[413,2],[414,1],[415,2],[416,2],[417,1],[418,1],[419,1],[420,3],[421,5],[422,5],[423,5],[424,5],[425,5],[426,5],[427,5],[428,5],[429,5],[430,5],[431,5],[432,5],[433,5],[434,5],[435,5],[436,5],[437,5],[438,5],[439,5],[440,5],[441,5],[442,5],[443,5],[444,5],[445,5],[446,5],[447,5],[448,5],[449,5],[450,5],[451,5],[452,5],[453,5],[454,5],[455,5],[456,5],[457,5],[458,5],[459,5],[460,5],[461,5],[462,5],[463,5],[464,5],[465,5],[466,5],[467,5],[468,5],[469,5],[470,5],[471,5],[472,5],[473,5],[474,5],[475,5],[476,5],[477,5],[478,5],[479,5],[480,5],[481,5],[482,5],[483,5],[484,5],[485,5],[486,5],[487,5],[488,5],[489,5],[490,5],[491,5],[492,3],[493,3],[494,7],[495,3],[496,3],[497,4],[498,2],[499,2],[500,0],[501,2],[502,3],[503,4],[504,2],[505,3],[506,4],[507,4],[508,1],[509,2],[510,2],[511,2],[512,2],[513,3],[514,2],[515,1],[516,1],[517,2],[518,1],[519,1],[520,2],[521,2],[522,2],[523,2],[524,2],[525,2],[526,2],[527,3],[528,2]]},"529":{"g":10,"i":0,"s":[]},"530":{"g":5,"i":0,"s":[]}},"531":{"532":{"g":5,"i":0,"s":[[533,1],[534,1],[535,1],[536,1],[537,1],[538,1],[539,1],[540,1],[541,1],[542,1],[543,1],[544,1],[545,1],[546,1],[547,1],[548,1],[549,1],[550,1],[551,1],[552,1],[553,1],[554,1],[555,1],[556,1],[557,1],[558,0],[559,1],[560,1],[561,1],[562,3],[563,1],[564,1],[565,1],[566,1],[567,1]]}},"568":{"569":{"g":10,"i":0,"s":[[570,10],[571,10],[572,0],[573,10],[574,10],[575,10],[576,10]]},"577":{"g":2,"i":0,"s":[[532,0]]},"578":{"g":20,"i":0,"s":[[579,7],[580,15],[581,15],[582,15],[583,15],[584,15],[585,15],[586,9],[587,15]]},"588":{"g":30,"i":0,"s":[[589,30],[590,30],[591,30],[592,30],[593,19],[594,30],[55,17],[595,30],[596,5],[597,30],[598,10],[599,30],[600,30],[601,30],[602,30],[603,13],[604,30],[605,30],[606,30],[607,30],[608,30],[609,30],[610,30]]},"611":{"g":10,"i":0,"s":[]},"612":{"g":5,"i":0,"s":[]},"613":{"g":4,"i":0,"s":[[614,2],[615,3],[616,3],[617,2],[618,3],[619,2],[620,2],[621,2],[622,2],[623,2],[624,2],[625,2],[626,3],[627,2],[628,2],[629,3],[630,2],[631,2],[632,3],[633,3],[634,4],[635,2],[636,3],[637,2],[638,2],[639,2],[640,2],[641,2],[642,2],[643,2],[644,3],[645,3],[646,3],[647,1],[648,3],[649,2],[650,2],[651,2],[652,2],[653,3],[654,2],[655,2],[656,1],[657,2],[658,3],[659,2],[660,3],[661,2],[662,2],[663,1],[664,1],[665,1],[666,1],[667,2]]}}},"a":[["2026-04-08","Керамическая копилка",50,58,66,"Новое объявление","2026-04-08",550.0,"телеграм"],["2026-04-08","История на миллион",568,578,585,"Новое объявление","2026-04-08",778.0,""],["2026-04-08","Открой в себе художника",568,578,585,"Новое объявление","2026-04-08",690.0,"телеграм"],["2026-04-08","Сольфеджио",568,578,586,"Новое объявление","2026-04-08",1500.0,"телеграм"],["2026-04-14","Скейт",568,613,641,"Новое объявление","2026-05-11",4706.0,""],["2026-04-17","Постельное белье",50,58,68,"Новое объявление","2026-04-17",1500.0,"телеграм"],["2026-04-20","Твидовый жакет",99,189,349,"Новое объявление","2026-04-20",1500.0,"телеграм"],["2026-04-22","Велосипед",568,577,668,"Новое объявление","2026-04-22",12000.0,"телеграм"],["2026-04-26","Поло Боско",99,100,180,"Новое объявление","2026-04-26",1200.0,"телеграм"],["2026-04-27","Красная туба",568,588,610,"Новое объявление","2026-04-29",300.0,""],["2026-04-27","Черное платье",99,189,351,"Новое объявление","2026-04-27",1500.0,"телеграм"],["2026-04-29","Гарри Поттер",568,578,587,"Новое объявление","2026-05-02",4765.0,""],["2026-04-30","Кроссовки красные с синим",99,189,225,"Новое объявление","2026-04-30",500.0,"телеграм"],["2026-05-01","Три книги от феи",568,578,587,"Новое объявление","2026-05-02",796.0,""],["2026-05-10","гель краски",99,181,183,"Переопубликация","2026-06-09",1200.0,"телеграм"],["2026-05-11","Наушники самсунг",0,1,11,"Новое объявление","2026-05-24",1502.0,""],["2026-05-11","Книга Винни Пух",568,578,582,"Новое объявление","2026-05-18",1000.0,"телеграм"],["2026-05-14","Книга Фотошоп",568,578,585,"Новое объявление","2026-06-05",291.0,""],["2026-05-15","Металлический тубус от виски",568,588,610,"Новое объявление","",0,""],["2026-05-15","Книга 1001 вопрос",568,578,585,"Новое объявление","2026-05-22",330.0,""],["2026-05-18","Кошелек женский Furla",99,189,510,"Продление","",0,""],["2026-05-18","Кроссовки Найк от феи",99,100,129,"Новое объявление","2026-05-18",334.0,""],["2026-05-19","Купальник",99,189,347,"Новое объявление","2026-05-19",600.0,"телеграм"],["2026-05-20","Литература",568,578,586,"Новое объявление","2026-05-20",360.0,""],["2026-05-20","История",568,578,586,"Новое объявление","2026-05-20",250.0,""],["2026-05-21","Картхолдер Т-банк",99,189,503,"Новое объявление","",0,""],["2026-05-22","Измельчитель",50,51,54,"Новое объявление","2026-05-23",700.0,"телеграм"],["2026-05-25","Чехол из фетра",0,28,668,"Новое объявление","2026-07-17",200.0,""],["2026-05-25","Тубус для кистей",99,181,183,"Переопубликация","",0,""],["2026-05-25","Дверная ручка",50,72,75,"Новое объявление","2026-08-10",290.0,"вб"],["2026-05-25","тубус бежевый",99,181,183,"Переопубликация","2026-05-31",273.0,""],["2026-05-28","Шорты и футболка красная",99,100,150,"Переопубликация","2026-06-27",815.0,""],["2026-05-28","Учебник английский",568,578,586,"Переопубликация","",0,""],["2026-05-28","Энциклопедия дом хоз",568,578,585,"Новое объявление","2026-05-28",339.0,""],["2026-05-28","книга Цой",568,578,585,"Новое объявление","2026-05-28",490.0,""],["2026-05-29","Ам нямы",568,588,55,"Новое объявление","",0,""],["2026-05-29","Шкатулка пенал",50,58,66,"Новое объявление","",0,""],["2026-05-29","Обвес котик",99,189,193,"Новое объявление","2026-06-01",228.0,""],["2026-05-30","Платье на выпускной",99,189,351,"Новое объявление","2026-06-27",3808.0,""],["2026-06-01","Шорты и две футболки 42-44",99,189,346,"Новое объявление","",0,""],["2026-06-01","Магнитные кубики",568,588,55,"Новое объявление","2026-06-02",454.0,""],["2026-06-02","Обвес на сумку зайчик",99,100,106,"Новое объявление","",0,""],["2026-06-03","Хрестоматии 2 книги",568,578,586,"Новое объявление","",0,""],["2026-06-05","Учебники 8 класс",568,578,586,"Новое объявление","",0,""],["2026-06-05","Портмоне мужской",99,189,503,"Новое объявление","2026-06-29",2448.0,""],["2026-06-06","Овощерезка",50,69,668,"Новое объявление","2026-07-12",380.0,"2 профиль"],["2026-06-08","Обвес на суму сова",99,189,193,"Новое объявление","2026-07-27",280.0,"ВБ"],["2026-06-08","Книга Руководство токарей",568,578,586,"Новое объявление","2026-06-27",827.0,""],["2026-06-08","Пилочки",99,181,183,"Переопубликация","",0,""],["2026-06-09","Акриловая пудра",99,181,183,"Переопубликация","",0,""],["2026-06-09","Уроки госпожи мелодии",568,578,586,"Переопубликация","",0,""],["2026-06-11","Носки Боско",99,189,195,"Новое объявление","2026-06-12",637.0,""],["2026-06-11","Строительное черчение",568,578,586,"Новое объявление","",0,""],["2026-06-12","Кепка Боско",99,189,192,"Новое объявление","2026-07-09",1600.0,"ВБ"],["2026-06-12","Платье вязанное",99,189,352,"Новое объявление","2026-06-12",501.0,""],["2026-06-13","Фигурка Ам няма",568,588,55,"Новое объявление","",0,""],["2026-06-14","Энциклопедия Электроника",568,578,586,"Новое объявление","2026-06-16",750.0,"телеграм"],["2026-06-15","Энциклопедия праздников",568,578,585,"Новое объявление","2026-08-20",300.0,"мах"],["2026-06-15","Кроссовки Адидас",99,100,129,"Переопубликация","2026-10-06",254.0,"авито 2"],["2026-06-16","Кроссовки белые",99,189,225,"Новое объявление","2026-06-17",630.0,"телеграм"],["2026-06-17","Кошелек женский Furla",99,189,524,"Новое объявление","",0,""],["2026-06-17","Сумка Furla",99,189,513,"Новое объявление","",0,""],["2026-06-19","Говорящий мужчина",99,529,668,"Новое объявление","2026-06-22",1107.0,""],["2026-06-20","Шкатулка из камня большая",50,58,66,"Новое объявление","2026-06-20",900.0,"с доставкой озон"],["2026-06-22","Ветровка",99,189,304,"Новое объявление","2026-06-27",1200.0,"вацап"],["2026-06-23","Жёлтый барабанщик",568,588,55,"Новое объявление","2026-07-22",1098.0,""],["2026-06-23","Яйцо из камня",50,58,66,"Новое объявление","2026-07-17",400.0,""],["2026-06-24","Платье серое нарядное",99,189,352,"Новое объявление","2026-06-25",1052.0,""],["2026-06-24","Чехол из фетра",0,28,668,"Переопубликация","2026-07-17",200.0,""],["2026-06-24","Платье в полоску",99,189,352,"Новое объявление","2026-06-11",507.0,""],["2026-06-25","Джинсовые шорты ТВОЕ 46",99,189,345,"Новое объявление","2026-09-09",334.0,"2 аккаунт"],["2026-06-26","Дверная ручка (2 профиль)",50,72,75,"Переопубликация","2026-08-10",290.0,"вб"],["2026-06-26","Пенал для кистей (2 профиль)",99,181,183,"Переопубликация","",0,""],["2026-06-26","Кейс от наушников (2 профиль)",0,29,30,"Переопубликация","",0,""],["2026-06-27","Лягушка йога",50,58,66,"Новое объявление","2026-08-26",230.0,"вб"],["2026-06-27","Костюм красный с шортами (2 профиль)",99,100,153,"Переопубликация","2026-06-27",815.0,""],["2026-06-27","Учебник английский",568,578,586,"Продление","2026-07-16",312.0,""],["2026-06-28","Ам нямы",568,588,55,"Продление","",0,""],["2026-06-28","Розовая блузка с кружевом",99,189,354,"Новое объявление","2026-07-07",346.0,""],["2026-06-28","Красный пенал (2 профиль)",50,58,66,"Переопубликация","",0,""],["2026-06-30","Лёгкий кардиган",99,189,344,"Новое объявление","2026-06-30",0,""],["2026-06-30","Велошлем",568,577,532,"Новое объявление","2026-06-30",500.0,"телеграмм"],["2026-07-01","Резиновые сапоги",99,100,169,"Новое объявление","2026-07-19",200.0,"вб"],["2026-07-01","Велошлем зелёный",568,577,532,"Новое объявление","2026-07-04",0,""],["2026-07-02","Шкатулка с ящерицами",50,58,66,"Новое объявление","2026-06-02",495.0,""],["2026-07-04","Детское постельное",99,529,668,"Новое объявление","2026-07-25",872.0,""],["2026-07-05","Советы по домоводству",568,578,585,"Новое объявление","2026-07-05",790.0,"телеграмм"],["2026-07-07","Самокат",568,613,643,"Новое объявление","2026-06-10",2936.0,"1шт, самовывоз"],["2026-07-08","Кроссовки чёрные тряпочные",99,189,261,"Новое объявление","2026-08-06",248.0,""],["2026-07-08","Фигурка лебедь",568,588,55,"Новое объявление","2026-07-09",0,""],["2026-07-09","Плойка для волос",50,51,53,"Новое объявление","2026-07-22",973.0,""],["2026-07-10","Кроссовки белые Time Jump.",99,189,261,"Новое объявление","2026-07-11",490.0,"телеграм"],["2026-07-12","Строительное черчение",568,578,586,"Новое объявление","",0,""],["2026-07-12","Велосипед",568,577,668,"Новое объявление","2026-07-13",2500.0,""],["2026-07-14","Рюмки Zepter",50,69,668,"Новое объявление","2026-08-13",10009.0,""],["2026-07-14","АМ няма большой 2 профиль",568,588,599,"Новое объявление","",0,""],["2026-07-14","Фоторюкзак",0,43,47,"Новое объявление","2026-07-17",1456.0,""],["2026-07-15","Икорницы",50,69,668,"Новое объявление","",0,""],["2026-07-15","Босоножки серые",99,189,257,"Новое объявление","",0,""],["2026-07-16","кроссовки адидас",99,100,129,"Переопубликация","2026-10-06",0,"авито 2"],["2026-07-17","Крема пакетом",99,181,187,"Новое объявление","2026-07-17",549.0,""],["2026-07-17","Сумка Furla",99,189,513,"Продление","",0,""],["2026-07-18","Жорж Сименон «Весь Мегрэ»",568,578,587,"Новое объявление","2026-07-18",714.0,""],["2026-07-20","Самокат детский",568,613,643,"Новое объявление","",0,""],["2026-07-21","Чайная пара Райская птица",50,69,668,"Новое объявление","2026-07-21",6241.0,"озон"],["2026-07-22","Картхолдер",99,189,503,"Продление","",0,""],["2026-07-22","Уходовая косметика бу",99,181,187,"Новое объявление","",0,""],["2026-07-18","Косметика для волос",99,181,186,"Новое объявление","2026-07-26",287.0,""],["2026-07-22","Глиняный чайник",50,69,668,"Новое объявление","2026-07-25",1791.0,""],["2026-07-23","Галоши утеплённые",99,100,164,"Новое объявление","2026-07-29",476.0,""],["2026-07-24","Шкатулка для колец",50,58,66,"Новое объявление","",0,""],["2026-07-26","Фигурка бегемотик",568,588,599,"Новое объявление","2026-07-26",378.0,""],["2026-07-27","Панно из янтаря",50,58,66,"Новое объявление","",0,""],["2026-07-28","Маска Халка",99,529,668,"Новое объявление","2026-09-09",1198.0,"2 профиль"],["2026-07-28","Ам нямы",568,588,55,"Продление","",0,""],["2026-07-28","Геннадий Малахов",568,578,585,"Новое объявление","",0,""],["2026-07-30","Пиратские часы",99,530,668,"Новое объявление","2026-07-30",550.0,"Телеграм"],["2026-08-02","Картина на срезе дерева",50,58,66,"Новое объявление","",0,""],["2026-08-02","Приключение Электроника",568,578,582,"Новое объявление","2026-08-02",550.0,"Телеграм"],["2026-08-03","Платье и две кофточки детские",99,100,136,"Новое объявление","",0,""],["2026-08-03","Костюм на мальчика голубой",99,100,162,"Новое объявление","2026-08-08",1919.0,""],["2026-08-05","кукла LOL OMG мальчик",99,529,668,"Новое объявление","",0,""],["2026-08-06","Комбинезон розовый 80",99,100,124,"Новое объявление","2026-08-11",850.0,"вб"],["2026-08-07","Доска на кухню",50,69,668,"Новое объявление","",0,""],["2026-08-08","Рука для маникюра",99,181,183,"Новое объявление","2026-08-29",1152.0,""],["2026-08-10","Постельное бельё зелёное",50,58,68,"Новое объявление","2026-08-15",1700.0,"вб"],["2026-08-11","Костюм розовый деми",99,100,119,"Новое объявление","2026-08-12",1699.0,"вб"],["2026-08-12","Иглы дикобраза",568,612,668,"Новое объявление","",0,""],["2026-08-13","Рюмки zepter",50,69,668,"Продление","2026-08-13",10009.0,""],["2026-08-14","Пилочки для ногтей",99,181,183,"Переопубликация","",0,""],["2026-08-15","Подстаканник",568,588,55,"Новое объявление","",0,""],["2026-08-16","Постельное бельё Togas",50,58,68,"Новое объявление","2026-08-16",2407.0,""],["2026-08-17","Сумка Furla",99,189,513,"Продление","",0,""],["2026-08-17","Комбез Lassie 86",99,100,124,"Новое объявление","2026-09-15",2110.0,""],["2026-08-18","Пододеяльник Togas",50,58,68,"Новое объявление","",0,""],["2026-08-19","книга Сделай это сам",568,578,585,"Новое объявление","2026-09-07",700.0,""],["2026-08-21","Этикет-пистолет",0,19,21,"Новое объявление","",0,""],["2026-08-22","Кроссовки детские белые",99,100,129,"Новое объявление","2026-08-30",365.0,""],["2026-08-22","Куртка чёрная",99,189,296,"Новое объявление","",0,""],["2026-08-23","Игрушка Амням большая",568,588,599,"Переопубликация","",0,""],["2026-08-24","Ботинки от феи потертые",99,100,164,"Новое объявление","",0,""],["2026-08-30","Пуговицы",99,189,201,"Новое объявление","",0,""],["2026-08-31","ножницы зингер",99,181,183,"Новое объявление","2026-08-31",854.0,""],["2026-08-31","Панно из янтаря",50,58,66,"Переопубликация","",0,""],["2026-09-01","Уроки госпожи Мелодии",568,578,586,"Продление","2026-09-01",138.0,""],["2026-09-01","Картина на срезе дерева",50,58,66,"Продление","2026-09-19",552.0,"ВБ"],["2026-09-02","Коробка Louis Vuitton",99,189,193,"Новое объявление","",0,""],["2026-09-02","Платье и две кофточки детские",99,100,136,"Переопубликация","",0,""],["2026-09-04","Колье и серьги",99,530,668,"Новое объявление","2026-10-20",640.0,"ВБ"],["2026-09-05","Кукла LOL OMG мальчик",99,529,668,"Продление","",0,""],["2026-09-07","Доска",50,69,668,"Продление","",0,""],["2026-09-11","Демисезонная куртка мятная",99,100,119,"Новое объявление","",0,""],["2026-09-11","Шпаргалки",568,578,586,"Новое объявление","",0,""],["2026-09-11","Иглы дикобраза",568,612,668,"Продление","",0,""],["2026-09-17","Сумка Furla",99,189,513,"Продление","",0,""],["2026-09-18","Пододеяльник",50,58,68,"Продление","2026-09-21",2409.0,""],["2026-09-20","Подстаканник",568,588,55,"Продление","",0,""],["2026-09-21","Книга Старик Хоттабыч",568,578,582,"Новое объявление","",0,""],["2026-09-21","Ботинки замшевые",99,189,259,"Новое объявление","",0,"2 профиль"],["2026-09-21","Книга Новое платье короля",568,578,582,"Новое объявление","",0,""],["2026-09-23","Костюм пуховый красный",99,100,157,"Новое объявление","",0,""],["2026-09-21","Пилочки для ногтей",99,181,183,"Продление","",0,""],["2026-09-23","Книга Умные сказки",568,578,582,"Новое объявление","",0,""],["2026-09-23","Ботинки от феи потертые",99,100,164,"Продление","",0,""],["2026-09-25","Ама няма",568,588,599,"Продление","2026-10-29",151.0,"вб"],["2026-09-27","Детские книги пакетом",568,578,582,"Новое объявление","",0,""],["2026-09-29","Истории Заколдованного леса 4 книги",568,578,582,"Новое объявление","",0,""],["2026-09-29","Пуговицы",99,189,201,"Продление","",0,""],["2026-09-29","Весь Мегрэ, 2 Тома",568,578,587,"Переопубликация","2026-10-20",420.0,"вб"],["2026-10-01","Аня в стране чудес",568,578,582,"Новое объявление","2026-10-03",650.0,"телеграм"],["2026-10-02","Платье и две кофточки",99,100,136,"Продление","2026-10-04",312.0,"вб"],["2026-10-03","Панно из янтаря",50,58,66,"Продление","2026-10-29",4200.0,""],["2026-10-03","Набор полотенец",50,69,668,"Новое объявление","",0,""],["2026-10-05","Постельное бельё розовое",50,58,68,"Новое объявление","",0,""],["2026-10-06","Кукла LOL OMG мальчик",99,529,668,"Новое объявление","2026-10-15",1930.0,"вб"],["2026-10-09","Демисезонная куртка мятная",99,100,119,"Продление","",0,""],["2026-10-10","Книга розы акварель",568,578,585,"Новое объявление","2026-10-11",490.0,""],["2026-10-11","Зимний костюм для девочки",99,100,119,"Новое объявление","2026-10-11",5000.0,"Авито, отправила озоном"],["2026-10-13","Иглы дикобраза",568,612,668,"Продление","",0,""],["2026-10-15","Цветы Акварель",568,578,585,"Новое объявление","",0,""],["2026-10-16","Красный кошелёк",99,189,510,"Новое объявление","",0,""],["2026-10-16","1000 рецептов",568,578,585,"Новое объявление","",772.0,""],["2026-10-16","Шкатулка книга",50,58,66,"Новое объявление","",0,""],["2026-10-20","Книга Winks",568,578,582,"Новое объявление","2026-10-21",450.0,"вб"],["2026-10-21","Книга Человек амфибия",568,578,587,"Новое объявление","",0,""],["2026-10-21","Куртка белая",99,100,119,"Новое объявление","",0,""],["2026-10-21","Костюм розовый",99,100,119,"Новое объявление","2026-10-30",2115.0,""],["2026-10-21","Пилочки для ногтей",99,181,183,"Продление","",0,""],["2026-10-22","Куртка чёрная",99,189,296,"Переопубликация","",0,""],["2026-10-22","Робособака",99,529,668,"Новое объявление","2026-10-27",880.0,""],["2026-10-22","Костюм розовый(смена категории)",99,100,122,"Новое объявление","2026-10-30",0,""],["2026-10-22","Смешарики",99,529,668,"Новое объявление","",0,""],["2026-10-23","Пуговица",99,189,201,"Новое объявление","",0,""],["2026-10-23","Книга сказки",568,578,582,"Новое объявление","",0,""],["2026-10-23","Застёжки для шубы",99,189,201,"Новое объявление","2026-11-11",240.0,"вб"],["2026-10-24","Книга Переселенцы Трансвааля",568,578,587,"Новое объявление","",0,""],["2026-10-24","Книги Женщина в белом 2 Тома",568,578,587,"Новое объявление","",0,""],["2026-10-24","Книги Тайный город 2 Тома",568,578,587,"Новое объявление","2026-10-24",500.0,"вб"],["2026-10-26","Ботинки от феи потертые",99,100,164,"Продление","",0,""],["2026-10-26","Брелок Миньон",99,189,193,"Новое объявление","2026-11-13",267.0,""],["2026-10-26","Ручки Nail Clab",0,19,21,"Новое объявление","",0,""],["2026-10-26","Кружка с девушкой",50,69,668,"Новое объявление","2026-11-13",784.0,""],["2026-10-27","Кроссовки Nike air",99,189,408,"Новое объявление","",0,""],["2026-10-28","Naбор для обуви",99,189,387,"Новое объявление","2026-10-31",0,""],["2026-10-28","Угги женские",99,189,271,"Новое объявление","",0,""],["2026-10-29","Истории Заколдованного леса 4 книги",568,578,582,"Продление","",0,""],["2026-10-29","Пуговицы",99,189,201,"Продление","",0,""],["2026-10-29","Дутики",99,189,235,"Новое объявление","",0,""],["2026-11-05","Постельное бельё розовое",50,58,68,"Продление","",0,""],["2026-11-06","Набор полотенец",50,69,668,"Новое объявление","",0,""],["2026-11-11","Книга про Новый год",568,578,582,"Новое объявление","2026-11-12",900.0,"телеграм"],["2026-11-11","Книга для мальчиков",568,578,582,"Новое объявление","2026-11-13",350.0,"вацап"],["2026-11-12","Книга Фунтик в цирке",568,578,582,"Новое объявление","2026-11-12",0,""],["2026-11-12","Книга аэрография на ногтях",568,578,586,"Новое объявление","",0,""],["2026-11-12","Кошелёк бирюзовый",99,189,503,"Новое объявление","",0,""],["2026-11-15","Книга цветы акварель",568,578,585,"Продление","",0,""],["2026-11-16","Постельное бельё Формула 1",99,529,668,"Новое объявление","",0,""]]};
+
+const STR = RAW_DATA.s;
+const TREE = {};
+for (const [c1Id, subObj] of Object.entries(RAW_DATA.t)) {
+  const c1 = STR[c1Id];
+  TREE[c1] = {};
+  for (const [c2Id, info] of Object.entries(subObj)) {
+    const c2 = STR[c2Id];
+    TREE[c1][c2] = {
+      g: info.g,
+      i: info.i,
+      s: info.s.map(([subId, lim]) => [STR[subId], lim])
+    };
+  }
+}
+
+function detectSubProfile(title, where) {
+  const hay = `${title} ${where}`.toLowerCase();
+  if (hay.includes('2 профиль') || hay.includes('авито 2') || hay.includes('2 аккаунт')) {
+    return '2';
+  }
+  return '1';
+}
+
+function normalizeWhere(rawWhere, isSold) {
+  const s = (rawWhere || '').toLowerCase().trim();
+  if (!s && !isSold) return '';
+  if (s.includes('вб') || s.includes('wb')) return 'ВБ';
+  if (s.includes('телеграм') || s.includes('телеграмм') || s.includes('тг')) return 'Телеграм';
+  if (s.includes('вацап') || s.includes('ватсап') || s.includes('whatsapp')) return 'Вацап';
+  if (s.includes('мах') || s.includes('max')) return 'MAX';
+  if (s.includes('авито') || s.includes('озон') || s.includes('самовывоз')) return 'Авито';
+  return isSold ? 'Авито' : '';
+}
+
+function getChannelStyle(channel) {
+  switch (channel) {
+    case 'ВБ':
+      return {
+        rowBg: 'bg-purple-100/90 hover:bg-purple-200/80',
+        borderL: 'border-l-[6px] border-l-purple-600',
+        dateColor: 'text-purple-800',
+        titleColor: 'text-purple-950',
+        badgeBg: 'bg-purple-600 text-white',
+        icon: '🟣'
+      };
+    case 'Телеграм':
+      return {
+        rowBg: 'bg-sky-100/90 hover:bg-sky-200/80',
+        borderL: 'border-l-[6px] border-l-sky-600',
+        dateColor: 'text-sky-800',
+        titleColor: 'text-sky-950',
+        badgeBg: 'bg-sky-600 text-white',
+        icon: '🔵'
+      };
+    case 'Вацап':
+      return {
+        rowBg: 'bg-lime-100/90 hover:bg-lime-200/80',
+        borderL: 'border-l-[6px] border-l-lime-600',
+        dateColor: 'text-lime-800',
+        titleColor: 'text-lime-950',
+        badgeBg: 'bg-lime-600 text-white',
+        icon: '🌿'
+      };
+    case 'MAX':
+      return {
+        rowBg: 'bg-amber-100/95 hover:bg-amber-200/85',
+        borderL: 'border-l-[6px] border-l-orange-500',
+        dateColor: 'text-orange-800',
+        titleColor: 'text-orange-950',
+        badgeBg: 'bg-orange-500 text-white',
+        icon: '🟠'
+      };
+    default: // Авито
+      return {
+        rowBg: 'bg-emerald-100/90 hover:bg-emerald-200/80',
+        borderL: 'border-l-[6px] border-l-emerald-600',
+        dateColor: 'text-emerald-800',
+        titleColor: 'text-emerald-950',
+        badgeBg: 'bg-emerald-600 text-white',
+        icon: '🟢'
+      };
+  }
+}
+
+const DEFAULT_ADS = RAW_DATA.a.map((row, idx) => {
+  const t = row[1];
+  const rawW = row[8] || '';
+  const sd = row[6] || '';
+  const ss = Number(row[7]) || 0;
+  const isSold = Boolean((sd && sd.trim() !== '') || ss > 0);
+  return {
+    id: 'init_' + idx,
+    p: 'p1',
+    sub: detectSubProfile(t, rawW),
+    d: row[0],
+    t: t,
+    c1: STR[row[2]] || '',
+    c2: STR[row[3]] || '',
+    c3: STR[row[4]] || '',
+    tp: row[5] || 'Новое объявление',
+    sd: sd,
+    ss: ss,
+    w: normalizeWhere(rawW, isSold),
+    rawW: rawW
+  };
+});
+
+let ads = [];
+let editingId = null;
+let currentTab = 'ads_p1';
+let dashProfile = 'p1';
+
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function getMoscowDateParts(dateObj = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(dateObj);
+
+  return {
+    year: Number(parts.find(p => p.type === 'year').value),
+    month: Number(parts.find(p => p.type === 'month').value),
+    day: Number(parts.find(p => p.type === 'day').value),
+    yearStr: parts.find(p => p.type === 'year').value,
+    monthStr: parts.find(p => p.type === 'month').value,
+    dayStr: parts.find(p => p.type === 'day').value
+  };
+}
+
+function getMoscowDateStr(dateObj = new Date()) {
+  const p = getMoscowDateParts(dateObj);
+  return `${p.yearStr}-${p.monthStr}-${p.dayStr}`;
+}
+
+function init() {
+  const saved = localStorage.getItem('avito_tracker_ads_v5');
+  if (saved) {
+    try { ads = JSON.parse(saved); } catch(e) { ads = [...DEFAULT_ADS]; }
+  } else {
+    ads = [...DEFAULT_ADS];
+  }
+
+  const mskNow = getMoscowDateParts();
+  const refInput = document.getElementById('ref-today');
+  refInput.value = `${mskNow.yearStr}-${mskNow.monthStr}-${mskNow.dayStr}`;
+
+  const mSel = document.getElementById('dash-month');
+  MONTHS_RU.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = m;
+    if (i === mskNow.month - 1) opt.selected = true;
+    mSel.appendChild(opt);
+  });
+
+  const ySel = document.getElementById('dash-year');
+  const years = Array.from(new Set([2025, 2026, 2027, mskNow.year])).sort();
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === mskNow.year) opt.selected = true;
+    ySel.appendChild(opt);
+  });
+
+  ['p1-cat-filter', 'p2-cat-filter'].forEach(selId => {
+    const catFilter = document.getElementById(selId);
+    Object.keys(TREE).forEach(c1 => {
+      const opt = document.createElement('option');
+      opt.value = c1;
+      opt.textContent = c1;
+      catFilter.appendChild(opt);
+    });
+  });
+
+  loadGoalForProfile();
+  renderAll();
+  switchTab('ads_p1');
+}
+
+function saveState() {
+  localStorage.setItem('avito_tracker_ads_v5', JSON.stringify(ads));
+}
+
+function loadGoalForProfile() {
+  const key = 'avito_tracker_goal_v5_' + dashProfile;
+  const val = localStorage.getItem(key) || (dashProfile === 'p1' ? '30' : '15');
+  document.getElementById('month-goal').value = val;
+  document.getElementById('goal-prof-label').textContent = dashProfile === 'p1' ? 'Авито 1' : 'Влада';
+}
+
+function saveGoal() {
+  const key = 'avito_tracker_goal_v5_' + dashProfile;
+  localStorage.setItem(key, document.getElementById('month-goal').value);
+}
+
+function setDashProfile(prof) {
+  dashProfile = prof;
+  const b1 = document.getElementById('dash-btn-p1');
+  const b2 = document.getElementById('dash-btn-p2');
+
+  if (prof === 'p1') {
+    b1.className = 'px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-xs transition';
+    b2.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition';
+  } else {
+    b2.className = 'px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-xs transition';
+    b1.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition';
+  }
+  loadGoalForProfile();
+  renderDashboard();
+}
+
+function toggleFilterPanel(prof) {
+  const panel = document.getElementById(`${prof}-filter-panel`);
+  const arrow = document.getElementById(`${prof}-filter-arrow`);
+  const isHidden = panel.classList.toggle('hidden');
+  arrow.textContent = isHidden ? '▼' : '▲';
+}
+
+function getRefToday() {
+  const val = document.getElementById('ref-today').value;
+  return val ? new Date(val + 'T00:00:00') : new Date(getMoscowDateStr() + 'T00:00:00');
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  return new Date(str + 'T00:00:00');
+}
+
+function addDays(dateObj, days) {
+  const res = new Date(dateObj);
+  res.setDate(res.getDate() + days);
+  return res;
+}
+
+function formatDateRu(dateObj) {
+  if (!dateObj) return '—';
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const y = dateObj.getFullYear();
+  return `${d}.${m}.${y}`;
+}
+
+function getLimitsFor(c1, c2, c3) {
+  if (!TREE[c1] || !TREE[c1][c2]) return { gen: 0, inner: 0 };
+  const node = TREE[c1][c2];
+  let gen = node.g || 0;
+  let inner = node.i || 0;
+  if (c3 && node.s) {
+    const found = node.s.find(x => x[0] === c3);
+    if (found) {
+      inner = found[1];
+      if (c2 === 'Велосипеды' && c3 === 'Запчасти и аксессуары') gen = 5;
+    }
+  }
+  return { gen, inner };
+}
+
+function enrichAd(ad) {
+  const today = getRefToday();
+  const pub = parseDate(ad.d);
+  let active = false;
+  let releaseDate = null;
+
+  if (pub) {
+    const diffDays = Math.floor((today - pub) / (1000 * 60 * 60 * 24));
+    active = diffDays >= 0 && diffDays <= 30;
+    releaseDate = addDays(pub, 30);
+  }
+
+  const lims = getLimitsFor(ad.c1, ad.c2, ad.c3);
+  const groupName = ad.c3 ? `${ad.c2} | ${ad.c3}` : ad.c2;
+  const isSold = Boolean((ad.sd && ad.sd.trim() !== '') || (ad.ss && ad.ss > 0));
+  const whereClean = isSold ? normalizeWhere(ad.w, true) : '';
+
+  return {
+    ...ad,
+    sub: ad.sub || '1',
+    active,
+    releaseDate,
+    genLimit: lims.gen,
+    innerLimit: lims.inner,
+    groupName,
+    isSold,
+    whereClean
+  };
+}
+
+function computeAnalyticsForProfile(prof) {
+  const profAds = ads.filter(a => (a.p || 'p1') === prof);
+  const enriched = profAds.map(enrichAd);
+  const activeAds = enriched.filter(a => a.active);
+  const expiredAds = enriched.filter(a => !a.active);
+
+  const genMap = {};
+  activeAds.forEach(a => {
+    if (a.genLimit > 0 && a.c2) {
+      if (!genMap[a.c2]) {
+        genMap[a.c2] = { name: a.c2, limit: a.genLimit, used: 0, minRelease: a.releaseDate };
+      }
+      genMap[a.c2].used += 1;
+      if (a.genLimit > genMap[a.c2].limit) genMap[a.c2].limit = a.genLimit;
+      if (a.releaseDate && (!genMap[a.c2].minRelease || a.releaseDate < genMap[a.c2].minRelease)) {
+        genMap[a.c2].minRelease = a.releaseDate;
+      }
+    }
+  });
+  const genList = Object.values(genMap).map(x => ({ ...x, left: x.limit - x.used })).sort((a,b) => a.left - b.left);
+
+  const innerMap = {};
+  activeAds.forEach(a => {
+    if (a.innerLimit > 0 && a.groupName) {
+      if (!innerMap[a.groupName]) {
+        innerMap[a.groupName] = { name: a.groupName, limit: a.innerLimit, used: 0, minRelease: a.releaseDate };
+      }
+      innerMap[a.groupName].used += 1;
+      if (a.releaseDate && (!innerMap[a.groupName].minRelease || a.releaseDate < innerMap[a.groupName].minRelease)) {
+        innerMap[a.groupName].minRelease = a.releaseDate;
+      }
+    }
+  });
+  const innerList = Object.values(innerMap).map(x => ({ ...x, left: x.limit - x.used })).sort((a,b) => a.left - b.left);
+
+  return { enriched, activeAds, expiredAds, genList, innerList };
+}
+
+function renderAll() {
+  const p1All = ads.filter(a => (a.p || 'p1') === 'p1');
+  const p2All = ads.filter(a => (a.p || 'p1') === 'p2');
+  document.getElementById('nav-p1-count').textContent = p1All.length;
+  document.getElementById('nav-p2-count').textContent = p2All.length;
+
+  renderDashboard();
+  renderAdsTable('p1');
+  renderAdsTable('p2');
+  renderCatalog();
+}
+
+function renderDashboard() {
+  const { enriched, activeAds, genList, innerList } = computeAnalyticsForProfile(dashProfile);
+  const today = getRefToday();
+  const selMonth = parseInt(document.getElementById('dash-month').value, 10);
+  const selYear = parseInt(document.getElementById('dash-year').value, 10);
+  const goal = parseInt(document.getElementById('month-goal').value, 10) || 30;
+
+  const monthPubs = enriched.filter(a => {
+    const d = parseDate(a.d);
+    return d && d.getMonth() === selMonth && d.getFullYear() === selYear;
+  });
+
+  const prevDate = new Date(selYear, selMonth - 1, 1);
+  const prevMonthPubs = enriched.filter(a => {
+    const d = parseDate(a.d);
+    return d && d.getMonth() === prevDate.getMonth() && d.getFullYear() === prevDate.getFullYear();
+  });
+
+  const newCount = monthPubs.filter(a => a.tp === 'Новое объявление').length;
+  const extCount = monthPubs.filter(a => a.tp === 'Продление').length;
+  const repCount = monthPubs.filter(a => a.tp === 'Переопубликация').length;
+
+  document.getElementById('kpi-active').textContent = activeAds.length;
+  document.getElementById('kpi-month-pubs').textContent = monthPubs.length;
+  document.getElementById('kpi-pub-breakdown').textContent = `Новых: ${newCount} • Продл.: ${extCount} • Переопубл.: ${repCount}`;
+
+  const diff = monthPubs.length - prevMonthPubs.length;
+  const diffEl = document.getElementById('kpi-month-diff');
+  if (prevMonthPubs.length === 0) {
+    diffEl.textContent = '—';
+    diffEl.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700';
+  } else {
+    const pct = Math.round((diff / prevMonthPubs.length) * 100);
+    diffEl.textContent = `${diff >= 0 ? '+' : ''}${pct}% к прошл. мес.`;
+    diffEl.className = `text-xs font-bold px-2 py-0.5 rounded-full ${diff >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`;
+  }
+
+  const goalPct = Math.round((monthPubs.length / goal) * 100);
+  document.getElementById('kpi-goal-pct').textContent = goalPct + '%';
+  document.getElementById('kpi-goal-frac').textContent = `${monthPubs.length} из ${goal}`;
+  document.getElementById('kpi-goal-bar').style.width = Math.min(goalPct, 100) + '%';
+
+  const monthSales = enriched.filter(a => {
+    const sd = parseDate(a.sd);
+    return sd && sd.getMonth() === selMonth && sd.getFullYear() === selYear;
+  });
+  const revenue = monthSales.reduce((acc, a) => acc + (a.ss || 0), 0);
+  const avgCheck = monthSales.length ? Math.round(revenue / monthSales.length) : 0;
+  document.getElementById('kpi-revenue').textContent = revenue.toLocaleString('ru-RU') + ' ₽';
+  document.getElementById('kpi-sales-meta').textContent = `Продано: ${monthSales.length} шт. • Ср. чек: ${avgCheck.toLocaleString('ru-RU')} ₽`;
+
+  const exhausted = [
+    ...genList.filter(x => x.left <= 0).map(x => ({ ...x, kind: 'Общий' })),
+    ...innerList.filter(x => x.left <= 0).map(x => ({ ...x, kind: 'Внутр.' }))
+  ];
+  document.getElementById('list-exhausted').innerHTML = exhausted.length ? exhausted.map(x => `
+    <div class="p-2 rounded-lg bg-rose-100/80 border border-rose-200 flex justify-between items-center gap-2">
+      <span class="font-bold text-rose-950 truncate" title="${x.name}">${x.name}</span>
+      <span class="shrink-0 text-rose-800 font-extrabold">до ${formatDateRu(x.minRelease)}</span>
+    </div>
+  `).join('') : '<div class="text-emerald-700 font-bold py-2">✅ Все лимиты в безопасности, исчерпанных нет!</div>';
+
+  const warnings = [
+    ...genList.filter(x => x.left >= 1 && x.left <= 2).map(x => ({ ...x, kind: 'Общий' })),
+    ...innerList.filter(x => x.left >= 1 && x.left <= 2).map(x => ({ ...x, kind: 'Внутр.' }))
+  ];
+  document.getElementById('list-warning').innerHTML = warnings.length ? warnings.map(x => `
+    <div class="p-2 rounded-lg bg-amber-100/80 border border-amber-200 flex justify-between items-center gap-2">
+      <span class="text-amber-950 font-semibold truncate" title="${x.name}">${x.name}</span>
+      <span class="shrink-0 px-2 py-0.5 rounded bg-amber-300/80 text-amber-950 font-extrabold">ост. ${x.left} (${x.kind})</span>
+    </div>
+  `).join('') : '<div class="text-slate-400 py-2">Нет категорий на грани исчерпания</div>';
+
+  const releasing = [
+    ...genList.map(x => ({ ...x, kind: 'Общий' })),
+    ...innerList.map(x => ({ ...x, kind: 'Внутр.' }))
+  ].filter(x => {
+    if (!x.minRelease) return false;
+    const d = Math.ceil((x.minRelease - today) / (1000 * 60 * 60 * 24));
+    return d >= 0 && d <= 7;
+  }).sort((a,b) => a.minRelease - b.minRelease);
+
+  document.getElementById('kpi-free-soon').textContent = `Освободится в ближайшие 7 дн.: ${releasing.length} групп`;
+  document.getElementById('list-releasing').innerHTML = releasing.length ? releasing.map(x => {
+    const d = Math.ceil((x.minRelease - today) / (1000 * 60 * 60 * 24));
+    return `
+      <div class="p-2 rounded-lg bg-sky-100/80 border border-sky-200 flex justify-between items-center gap-2">
+        <span class="text-sky-950 font-semibold truncate" title="${x.name}">${x.name}</span>
+        <span class="shrink-0 text-sky-800 font-extrabold">${d === 0 ? 'сегодня' : 'через ' + d + ' дн.'}</span>
+      </div>
+    `;
+  }).join('') : '<div class="text-slate-400 py-2">В ближайшие 7 дней освобождений нет</div>';
+
+  document.getElementById('table-general-limits').innerHTML = genList.map(x => {
+    const badge = x.left <= 0 ? 'bg-rose-600 text-white' : (x.left <= 2 ? 'bg-amber-400 text-amber-950' : 'bg-emerald-500 text-white');
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="py-2.5 px-3 font-bold text-slate-800">${x.name}</td>
+        <td class="py-2.5 px-2 text-center text-slate-600 font-semibold">${x.limit}</td>
+        <td class="py-2.5 px-2 text-center font-extrabold">${x.used}</td>
+        <td class="py-2.5 px-2 text-center"><span class="px-2 py-0.5 rounded-full font-extrabold ${badge}">${x.left}</span></td>
+        <td class="py-2.5 px-3 text-right text-slate-600 font-medium">${formatDateRu(x.minRelease)}</td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-400">Нет активных объявлений с общим лимитом</td></tr>';
+
+  document.getElementById('table-inner-limits').innerHTML = innerList.map(x => {
+    const badge = x.left <= 0 ? 'bg-rose-600 text-white' : (x.left <= 2 ? 'bg-amber-400 text-amber-950' : 'bg-emerald-500 text-white');
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="py-2.5 px-3 font-bold text-slate-800">${x.name}</td>
+        <td class="py-2.5 px-2 text-center text-slate-600 font-semibold">${x.limit}</td>
+        <td class="py-2.5 px-2 text-center font-extrabold">${x.used}</td>
+        <td class="py-2.5 px-2 text-center"><span class="px-2 py-0.5 rounded-full font-extrabold ${badge}">${x.left}</span></td>
+        <td class="py-2.5 px-3 text-right text-slate-600 font-medium">${formatDateRu(x.minRelease)}</td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-400">Нет активных объявлений с внутренним лимитом</td></tr>';
+
+  const usedC2 = new Set(activeAds.map(a => a.c2));
+  const freeC2 = [];
+  for (const [c1, subObj] of Object.entries(TREE)) {
+    for (const [c2, info] of Object.entries(subObj)) {
+      if (info.g > 0 && !usedC2.has(c2)) {
+        freeC2.push({ c2, g: info.g });
+      }
+    }
+  }
+  document.getElementById('free-niches-badges').innerHTML = freeC2.map(n => `
+    <span class="px-3 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-950 text-xs font-bold">
+      ${n.c2} <strong class="ml-1 text-emerald-700">(${n.g} мест)</strong>
+    </span>
+  `).join('');
+}
+
+function renderAdsTable(prof) {
+  const { enriched, activeAds, expiredAds } = computeAnalyticsForProfile(prof);
+  document.getElementById(`${prof}-active-count`).textContent = activeAds.length;
+  document.getElementById(`${prof}-expired-count`).textContent = expiredAds.length;
+
+  const q = document.getElementById(`${prof}-search`).value.toLowerCase().trim();
+  const st = document.getElementById(`${prof}-status-filter`).value;
+  const cat = document.getElementById(`${prof}-cat-filter`).value;
+  const subFilter = prof === 'p1' ? document.getElementById('p1-sub-filter').value : 'all';
+  const sortMode = document.getElementById(`${prof}-sort`).value;
+
+  const hasFilter = q !== '' || st !== 'all' || cat !== 'all' || (prof === 'p1' && subFilter !== 'all');
+  document.getElementById(`${prof}-filter-badge`).classList.toggle('hidden', !hasFilter);
+
+  let filtered = enriched.slice().reverse().filter(a => {
+    if (st === 'active' && !a.active) return false;
+    if (st === 'expired' && a.active) return false;
+    if (st === 'sold' && !a.isSold) return false;
+    if (cat !== 'all' && a.c1 !== cat) return false;
+    if (prof === 'p1' && subFilter !== 'all' && (a.sub || '1') !== subFilter) return false;
+    if (q) {
+      const hay = `${a.t} ${a.c1} ${a.c2} ${a.c3} ${a.whereClean}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (sortMode === 'status_active') {
+    filtered.sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0) || b.d.localeCompare(a.d));
+  } else if (sortMode === 'status_expired') {
+    filtered.sort((a, b) => (a.active ? 1 : 0) - (b.active ? 1 : 0) || b.d.localeCompare(a.d));
+  } else if (sortMode === 'where_asc') {
+    const order = { 'Авито': 1, 'ВБ': 2, 'Телеграм': 3, 'Вацап': 4, 'MAX': 5, '': 99 };
+    filtered.sort((a, b) => (order[a.whereClean] || 50) - (order[b.whereClean] || 50) || b.d.localeCompare(a.d));
+  } else if (sortMode === 'sold_first') {
+    filtered.sort((a, b) => (b.isSold ? 1 : 0) - (a.isSold ? 1 : 0) || (b.sd || '').localeCompare(a.sd || ''));
+  }
+
+  document.getElementById(`${prof}-shown-count`).textContent = filtered.length;
+
+  document.getElementById(`${prof}-tbody`).innerHTML = filtered.slice(0, 300).map(a => {
+    let rowClass, firstCellClass, titleColor;
+
+    if (a.isSold) {
+      const stStyle = getChannelStyle(a.whereClean);
+      rowClass = `${stStyle.rowBg} transition`;
+      firstCellClass = `py-2.5 px-3 whitespace-nowrap ${stStyle.borderL}`;
+      titleColor = stStyle.titleColor;
+    } else if (!a.active) {
+      rowClass = 'bg-white hover:bg-slate-50 transition';
+      firstCellClass = 'py-2.5 px-3 whitespace-nowrap border-l-[6px] border-l-rose-400';
+      titleColor = 'text-slate-600';
+    } else {
+      rowClass = 'bg-white hover:bg-sky-50/60 transition';
+      firstCellClass = 'py-2.5 px-3 whitespace-nowrap border-l-[6px] border-l-emerald-500';
+      titleColor = 'text-slate-900';
+    }
+
+    const slotIconHtml = a.active
+      ? '<span title="Активно (занимает слот ≤ 30 дн.)" class="text-sm leading-none">✅</span>'
+      : '<span title="Сгорело (> 30 дн., слот свободен)" class="text-sm leading-none">❌</span>';
+
+    const soldDateHtml = a.isSold
+      ? `<div class="text-[11px] font-extrabold ${getChannelStyle(a.whereClean).dateColor} mt-0.5 pl-5">${getChannelStyle(a.whereClean).icon} ${a.sd ? formatDateRu(parseDate(a.sd)) : 'Продано'}</div>`
+      : '';
+
+    const subCellHtml = prof === 'p1'
+      ? `<td class="py-2.5 px-2 text-center">
+           <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black shadow-2xs ${a.sub === '2' ? 'bg-indigo-600 text-white' : 'bg-sky-600 text-white'}" title="Связанный профиль ${a.sub}">
+             ${a.sub}
+           </span>
+         </td>`
+      : '';
+
+    return `
+      <tr class="${rowClass}">
+        <td class="${firstCellClass}">
+          <div class="flex items-center gap-1.5 font-bold text-slate-800">
+            ${slotIconHtml}
+            <span>${formatDateRu(parseDate(a.d))}</span>
+          </div>
+          ${soldDateHtml}
+        </td>
+        ${subCellHtml}
+        <td class="py-2.5 px-3 max-w-[230px]">
+          <div class="font-bold ${titleColor} truncate" title="${a.t}">${a.t}</div>
+        </td>
+        <td class="py-2.5 px-3 text-slate-700 max-w-[210px]">
+          <div class="font-bold text-slate-800 truncate">${a.c2}</div>
+          <div class="text-[11px] text-slate-500 truncate">${a.c3 || a.c1}</div>
+        </td>
+        <td class="py-2.5 px-2 text-center font-mono font-bold text-slate-800 whitespace-nowrap">${a.genLimit || '—'} / ${a.innerLimit || '—'}</td>
+        <td class="py-2.5 px-2 text-center whitespace-nowrap font-medium ${!a.active ? 'text-rose-700 font-bold' : 'text-slate-600'}">${formatDateRu(a.releaseDate)}</td>
+        <td class="py-2.5 px-2 text-slate-600 font-medium whitespace-nowrap">${a.tp}</td>
+        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+          ${a.ss ? `<span class="font-black text-slate-900">${a.ss.toLocaleString('ru-RU')} ₽</span>` : (a.isSold ? '<span class="font-bold text-slate-700">Продано</span>' : '—')}
+          ${a.isSold ? `<div class="text-[10px] font-extrabold uppercase ${getChannelStyle(a.whereClean).dateColor}">${a.whereClean}</div>` : ''}
+        </td>
+        <td class="py-2.5 px-3 text-center whitespace-nowrap">
+          <button onclick="openDuplicateModal('${a.id}')" class="text-emerald-700 hover:text-emerald-900 font-bold hover:underline mr-2" title="Создать копию для продления или повторного размещения">Копия</button>
+          <button onclick="openEditModal('${a.id}')" class="text-sky-700 hover:text-sky-900 font-bold hover:underline mr-2">Изм.</button>
+          <button onclick="deleteAd('${a.id}')" class="text-rose-600 hover:text-rose-800 font-bold hover:underline">Удал.</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderCatalog() {
+  const p1Active = computeAnalyticsForProfile('p1').activeAds;
+  const p2Active = computeAnalyticsForProfile('p2').activeAds;
+  const q = document.getElementById('catalog-search').value.toLowerCase().trim();
+  const rows = [];
+
+  for (const [c1, subObj] of Object.entries(TREE)) {
+    for (const [c2, info] of Object.entries(subObj)) {
+      if (info.s && info.s.length) {
+        for (const [c3, il] of info.s) {
+          if (q && !`${c1} ${c2} ${c3}`.toLowerCase().includes(q)) continue;
+          const u1 = p1Active.filter(a => a.c2 === c2 && a.c3 === c3).length;
+          const u2 = p2Active.filter(a => a.c2 === c2 && a.c3 === c3).length;
+          rows.push({ c1, c2, c3, gl: info.g, il, u1, u2 });
+        }
+      } else {
+        if (q && !`${c1} ${c2}`.toLowerCase().includes(q)) continue;
+        const u1 = p1Active.filter(a => a.c2 === c2).length;
+        const u2 = p2Active.filter(a => a.c2 === c2).length;
+        rows.push({ c1, c2, c3: '—', gl: info.g, il: info.i, u1, u2 });
+      }
+    }
+  }
+
+  document.getElementById('catalog-tbody').innerHTML = rows.slice(0, 250).map(r => `
+    <tr class="hover:bg-slate-50">
+      <td class="py-2 px-3 text-slate-500">${r.c1}</td>
+      <td class="py-2 px-3 font-bold text-slate-800">${r.c2}</td>
+      <td class="py-2 px-3 text-slate-600">${r.c3}</td>
+      <td class="py-2 px-3 text-center font-extrabold">${r.gl || '—'}</td>
+      <td class="py-2 px-3 text-center font-extrabold text-sky-700">${r.il || '—'}</td>
+      <td class="py-2 px-3 text-center">${r.u1 > 0 ? `<span class="px-2 py-0.5 rounded bg-sky-600 text-white font-bold">${r.u1}</span>` : '<span class="text-slate-300">0</span>'}</td>
+      <td class="py-2 px-3 text-center">${r.u2 > 0 ? `<span class="px-2 py-0.5 rounded bg-purple-600 text-white font-bold">${r.u2}</span>` : '<span class="text-slate-300">0</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['dashboard', 'ads_p1', 'ads_p2', 'catalog', 'sync'].forEach(t => {
+    document.getElementById('view-' + t).classList.toggle('hidden', t !== tab);
+  });
+
+  const p1Btn = document.getElementById('tab-ads_p1');
+  const p2Btn = document.getElementById('tab-ads_p2');
+
+  if (tab === 'ads_p1') {
+    p1Btn.className = 'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md ring-2 ring-sky-300 transition';
+    p2Btn.className = 'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-white/10 text-white border border-white/20 hover:bg-white/20 transition';
+    setDashProfile('p1');
+  } else if (tab === 'ads_p2') {
+    p2Btn.className = 'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md ring-2 ring-fuchsia-300 transition';
+    p1Btn.className = 'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-white/10 text-white border border-white/20 hover:bg-white/20 transition';
+    setDashProfile('p2');
+  } else {
+    p1Btn.className = 'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-white/10 text-white border border-white/20 hover:bg-white/20 transition';
+    p2Btn.className = 'flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm sm:text-base font-black bg-white/10 text-white border border-white/20 hover:bg-white/20 transition';
+  }
+
+  ['dashboard', 'catalog', 'sync'].forEach(u => {
+    const btn = document.getElementById('tab-' + u);
+    if (tab === u) {
+      btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-amber-400 text-slate-950 shadow-xs transition';
+    } else {
+      btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/15 text-white hover:bg-white/25 transition';
+    }
+  });
+}
+
+function setSubProfile(val) {
+  document.getElementById('f-subprofile').value = val;
+  const b1 = document.getElementById('sub-btn-1');
+  const b2 = document.getElementById('sub-btn-2');
+  if (val === '1') {
+    b1.className = 'py-2 px-3 rounded-lg border-2 border-sky-600 bg-sky-50 text-sky-900 font-extrabold text-center transition';
+    b2.className = 'py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-600 font-bold text-center hover:bg-slate-50 transition';
+  } else {
+    b2.className = 'py-2 px-3 rounded-lg border-2 border-indigo-600 bg-indigo-50 text-indigo-900 font-extrabold text-center transition';
+    b1.className = 'py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-600 font-bold text-center hover:bg-slate-50 transition';
+  }
+}
+
+function onModalProfileChange() {
+  const prof = document.getElementById('f-profile').value;
+  document.getElementById('f-subprofile-wrap').classList.toggle('hidden', prof !== 'p1');
+  updateModalLimitPreview();
+}
+
+function toggleSyncSubSelect() {
+  const prof = document.getElementById('sync-target-profile').value;
+  document.getElementById('sync-sub-profile').classList.toggle('hidden', prof !== 'p1');
+}
+
+function populateCat1(selectedC1) {
+  const s1 = document.getElementById('f-cat1');
+  s1.innerHTML = Object.keys(TREE).map(c => `<option value="${c}" ${c === selectedC1 ? 'selected' : ''}>${c}</option>`).join('');
+  onCat1Change();
+}
+
+function onCat1Change(selectedC2) {
+  const c1 = document.getElementById('f-cat1').value;
+  const s2 = document.getElementById('f-cat2');
+  const subKeys = Object.keys(TREE[c1] || {});
+  s2.innerHTML = subKeys.map(c => `<option value="${c}" ${c === selectedC2 ? 'selected' : ''}>${c}</option>`).join('');
+  onCat2Change();
+}
+
+function onCat2Change(selectedC3) {
+  const c1 = document.getElementById('f-cat1').value;
+  const c2 = document.getElementById('f-cat2').value;
+  const s3 = document.getElementById('f-cat3');
+  const subs = (TREE[c1] && TREE[c1][c2] && TREE[c1][c2].s) ? TREE[c1][c2].s : [];
+  if (subs.length === 0) {
+    s3.innerHTML = '<option value="">— Без уточнения —</option>';
+  } else {
+    s3.innerHTML = '<option value="">— Выберите уточнение —</option>' + subs.map(([name]) => `<option value="${name}" ${name === selectedC3 ? 'selected' : ''}>${name}</option>`).join('');
+  }
+  updateModalLimitPreview();
+}
+
+function updateModalLimitPreview() {
+  const prof = document.getElementById('f-profile').value;
+  const c1 = document.getElementById('f-cat1').value;
+  const c2 = document.getElementById('f-cat2').value;
+  const c3 = document.getElementById('f-cat3').value;
+  const lims = getLimitsFor(c1, c2, c3);
+  const { activeAds } = computeAnalyticsForProfile(prof);
+
+  const usedGen = activeAds.filter(a => a.c2 === c2).length;
+  const usedInner = c3 ? activeAds.filter(a => a.c2 === c2 && a.c3 === c3).length : activeAds.filter(a => a.c2 === c2).length;
+
+  const genLeft = lims.gen ? (lims.gen - usedGen) : null;
+  const innerLeft = lims.inner ? (lims.inner - usedInner) : null;
+
+  const box = document.getElementById('modal-limit-preview');
+  const blocked = (genLeft !== null && genLeft <= 0) || (innerLeft !== null && innerLeft <= 0);
+  const profLabel = prof === 'p1' ? 'Авито 1' : 'Влада';
+  box.className = `p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${blocked ? 'bg-rose-100 border-rose-300 text-rose-950' : 'bg-emerald-100 border-emerald-300 text-emerald-950'}`;
+  box.innerHTML = `
+    <div>
+      <strong>${blocked ? `🟥 ${profLabel}: лимит исчерпан!` : `🟩 ${profLabel}: свободные места есть`}</strong>
+      <div class="text-[11px] opacity-90">Общий лимит: ${lims.gen ? `${usedGen}/${lims.gen} (ост. ${genLeft})` : 'нет'} • Внутренний: ${lims.inner ? `${usedInner}/${lims.inner} (ост. ${innerLeft})` : 'нет'}</div>
+    </div>
+  `;
+}
+
+function openAddModal(forcedProf) {
+  editingId = null;
+  const targetProf = forcedProf || (currentTab === 'ads_p2' ? 'p2' : dashProfile);
+  document.getElementById('modal-title').textContent = 'Новое объявление';
+  document.getElementById('f-profile').value = targetProf;
+  setSubProfile('1');
+  onModalProfileChange();
+  document.getElementById('f-date').value = document.getElementById('ref-today').value;
+  document.getElementById('f-title').value = '';
+  document.getElementById('f-type').value = 'Новое объявление';
+  document.getElementById('f-sold-date').value = '';
+  document.getElementById('f-sold-sum').value = '';
+  document.getElementById('f-where').value = 'Авито';
+  populateCat1('Личные вещи');
+  document.getElementById('ad-modal').classList.remove('hidden');
+  document.getElementById('ad-modal').classList.add('flex');
+}
+
+function openEditModal(id) {
+  const ad = ads.find(x => x.id === id);
+  if (!ad) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Редактировать объявление';
+  document.getElementById('f-profile').value = ad.p || 'p1';
+  setSubProfile(ad.sub || '1');
+  onModalProfileChange();
+  document.getElementById('f-date').value = ad.d;
+  document.getElementById('f-title').value = ad.t;
+  document.getElementById('f-type').value = ad.tp;
+  document.getElementById('f-sold-date').value = ad.sd || '';
+  document.getElementById('f-sold-sum').value = ad.ss || '';
+  document.getElementById('f-where').value = normalizeWhere(ad.w, true) || 'Авито';
+  populateCat1(ad.c1);
+  onCat1Change(ad.c2);
+  onCat2Change(ad.c3);
+  document.getElementById('ad-modal').classList.remove('hidden');
+  document.getElementById('ad-modal').classList.add('flex');
+}
+
+function openDuplicateModal(id) {
+  const ad = ads.find(x => x.id === id);
+  if (!ad) return;
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Копия объявления (продление / повтор)';
+  document.getElementById('f-profile').value = ad.p || 'p1';
+  setSubProfile(ad.sub || '1');
+  onModalProfileChange();
+  document.getElementById('f-date').value = document.getElementById('ref-today').value;
+  document.getElementById('f-title').value = ad.t;
+  document.getElementById('f-type').value = 'Продление';
+  document.getElementById('f-sold-date').value = '';
+  document.getElementById('f-sold-sum').value = '';
+  document.getElementById('f-where').value = 'Авито';
+  populateCat1(ad.c1);
+  onCat1Change(ad.c2);
+  onCat2Change(ad.c3);
+  document.getElementById('ad-modal').classList.remove('hidden');
+  document.getElementById('ad-modal').classList.add('flex');
+}
+
+function closeModal() {
+  document.getElementById('ad-modal').classList.add('hidden');
+  document.getElementById('ad-modal').classList.remove('flex');
+}
+
+function saveAd() {
+  const p = document.getElementById('f-profile').value;
+  const sub = p === 'p1' ? document.getElementById('f-subprofile').value : '1';
+  const d = document.getElementById('f-date').value;
+  const t = document.getElementById('f-title').value.trim();
+  const c1 = document.getElementById('f-cat1').value;
+  const c2 = document.getElementById('f-cat2').value;
+  const c3 = document.getElementById('f-cat3').value;
+  const tp = document.getElementById('f-type').value;
+  const sd = document.getElementById('f-sold-date').value;
+  const ss = parseFloat(document.getElementById('f-sold-sum').value) || 0;
+  const isSold = Boolean((sd && sd.trim() !== '') || ss > 0);
+  const w = isSold ? document.getElementById('f-where').value : '';
+
+  if (!d || !t) {
+    alert('Укажите дату публикации и название объявления!');
+    return;
+  }
+
+  if (editingId) {
+    const idx = ads.findIndex(x => x.id === editingId);
+    if (idx !== -1) ads[idx] = { ...ads[idx], p, sub, d, t, c1, c2, c3, tp, sd, ss, w };
+  } else {
+    ads.push({ id: 'ad_' + Date.now(), p, sub, d, t, c1, c2, c3, tp, sd, ss, w });
+  }
+
+  saveState();
+  closeModal();
+  renderAll();
+}
+
+function deleteAd(id) {
+  if (!confirm('Удалить эту запись из трекера?')) return;
+  ads = ads.filter(x => x.id !== id);
+  saveState();
+  renderAll();
+}
+
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  ['p1', 'p2'].forEach(prof => {
+    const { enriched } = computeAnalyticsForProfile(prof);
+    const rows = enriched.map(a => {
+      const base = {
+        'Дата публикации': a.d,
+        'Название объявления': a.t,
+        'Категория': a.c1,
+        'Подкатегория': a.c2,
+        'Подподкатегория/уточнение': a.c3,
+        'Статус лимита': a.active ? 'Активно' : 'Сгорело',
+        'Внутренняя Группа': a.groupName,
+        'Дата освобождения лимита': a.releaseDate ? getMoscowDateStr(a.releaseDate) : '',
+        'Общий лимит': a.genLimit || '',
+        'Внутренний лимит': a.innerLimit || '',
+        'Тип публикации': a.tp,
+        'Дата продажи': a.sd,
+        'Сумма продажи': a.ss || '',
+        'Где продалось': a.whereClean
+      };
+      if (prof === 'p1') base['Связанный профиль (1/2)'] = a.sub || '1';
+      return base;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, prof === 'p1' ? 'Авито_1' : 'Влада');
+  });
+  XLSX.writeFile(wb, 'Трекер_лимитов_Авито1_и_Влада.xlsx');
+}
+
+function importExcel(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+
+  if (file.name.endsWith('.json')) {
+    reader.onload = function(e) {
+      try {
+        const json = JSON.parse(e.target.result);
+        if (json && Array.isArray(json.ads)) {
+          ads = json.ads;
+          saveState();
+          renderAll();
+          alert(`Успешно восстановлена резервная копия! Загружено объявлений: ${ads.length}`);
+        } else {
+          alert('Ошибка: файл резервной копии имеет неверный формат.');
+        }
+      } catch (err) {
+        alert('Ошибка при чтении JSON файла: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    return;
+  }
+
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const imported = [];
+
+      const parseSheet = (sheetName, forcedProf) => {
+        const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+        raw.forEach((r, idx) => {
+          const title = r['Название объявления'];
+          const pub = r['Дата публикации'];
+          if (title && pub) {
+            const tStr = String(title).trim();
+            const wStr = String(r['Где продалось'] || '').trim();
+            const subRaw = String(r['Связанный профиль (1/2)'] || '').trim();
+            const sd = r['Дата продажи'] ? String(r['Дата продажи']).slice(0, 10) : '';
+            const ss = parseFloat(r['Сумма продажи']) || 0;
+            const isSold = Boolean(sd || ss > 0);
+            imported.push({
+              id: 'imp_' + Date.now() + '_' + sheetName + '_' + idx,
+              p: forcedProf || 'p1',
+              sub: (subRaw === '1' || subRaw === '2') ? subRaw : detectSubProfile(tStr, wStr),
+              d: String(pub).slice(0, 10),
+              t: tStr,
+              c1: String(r['Категория'] || '').trim(),
+              c2: String(r['Подкатегория'] || '').trim(),
+              c3: String(r['Подподкатегория/уточнение'] || '').trim(),
+              tp: String(r['Тип публикации'] || 'Новое объявление').trim(),
+              sd: sd,
+              ss: ss,
+              w: normalizeWhere(wStr, isSold)
+            });
+          }
+        });
+      };
+
+      if (wb.SheetNames.includes('Авито_1') || wb.SheetNames.includes('Влада')) {
+        if (wb.SheetNames.includes('Авито_1')) parseSheet('Авито_1', 'p1');
+        if (wb.SheetNames.includes('Влада')) parseSheet('Влада', 'p2');
+      } else {
+        const sn = wb.SheetNames.includes('Мои_Объявления') ? 'Мои_Объявления' : wb.SheetNames[0];
+        parseSheet(sn, 'p1');
+      }
+
+      if (imported.length) {
+        ads = imported;
+        saveState();
+        renderAll();
+        alert(`Успешно загружено объявлений из Excel: ${imported.length}`);
+      } else {
+        alert('Не удалось найти строки с колонками "Дата публикации" и "Название объявления".');
+      }
+    } catch (err) {
+      alert('Ошибка при чтении Excel файла: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportBackup() {
+  const data = {
+    version: 3,
+    date: new Date().toISOString(),
+    ads: ads
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Avito_Limits_Backup_' + getMoscowDateStr() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function copyScraperCode() {
+  const code = document.getElementById('scraper-code').innerText;
+  navigator.clipboard.writeText(code).then(() => alert('Код скопирован!'));
+}
+
+function processAvitoJsonImport() {
+  const raw = document.getElementById('avito-import-json').value.trim();
+  const prof = document.getElementById('sync-target-profile').value;
+  const sub = prof === 'p1' ? document.getElementById('sync-sub-profile').value : '1';
+  const skipDup = document.getElementById('sync-skip-duplicates').checked;
+  const msgEl = document.getElementById('sync-result-msg');
+
+  if (!raw) {
+    alert('Вставьте JSON-данные из консоли Avito.');
+    return;
+  }
+
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) throw new Error('Ожидался массив объявлений');
+    let added = 0;
+    const existingTitles = new Set(ads.filter(a => (a.p || 'p1') === prof).map(a => a.t.toLowerCase()));
+
+    arr.forEach((item, i) => {
+      const title = String(item.title || '').trim();
+      if (!title) return;
+      if (skipDup && existingTitles.has(title.toLowerCase())) return;
+      ads.push({
+        id: 'sync_' + Date.now() + '_' + i,
+        p: prof,
+        sub: sub,
+        d: item.date || getMoscowDateStr(),
+        t: title,
+        c1: item.cat1 || 'Личные вещи',
+        c2: item.cat2 || 'Одежда, обувь, аксессуары',
+        c3: item.cat3 || '',
+        tp: item.type || 'Новое объявление',
+        sd: '',
+        ss: 0,
+        w: ''
+      });
+      existingTitles.add(title.toLowerCase());
+      added++;
+    });
+
+    saveState();
+    renderAll();
+    msgEl.className = 'text-xs font-bold p-3 rounded-lg bg-emerald-100 text-emerald-900 block';
+    msgEl.textContent = `✅ Импортировано объявлений: ${added}`;
+  } catch (e) {
+    msgEl.className = 'text-xs font-bold p-3 rounded-lg bg-rose-100 text-rose-900 block';
+    msgEl.textContent = `❌ Ошибка разбора JSON: ${e.message}`;
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
