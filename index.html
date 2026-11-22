@@ -133,15 +133,32 @@
       };
 
       var blob = new Blob([JSON.stringify(dynamicManifest)], { type: 'application/manifest+json' });
-      var blobUrl = URL.createObjectURL(blob);
-      var manifestEl = document.getElementById('pwa-manifest-link');
-      if (manifestEl) manifestEl.href = blobUrl;
-    } catch (err) {
-      // Fallback к статическому ./manifest.json при ошибке
-    }
-  })();
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" sizes="192x192" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAElElEQVR4nO3dsY4bNxCGYc2d8uVSuu8AacDpwk3mLtSlClBfckMbr+iVPD974AOe54klnl7g+w63w5njy9evnz/80SDU76MvAEYSANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAER7N/oCRvn27ev99e/fvv975JXMo8f3i8b+kbwebhn4t/6vIM4hgIM9MvTX/lwxHEcABzhr6K95PTE8xofgB/Ue/mqvPzsnwJ0qDd52LU6D2zkB7lBp+PeqXldlToAbzDBgToPbOAGuNMPw7812vaMI4AqzDtOs192TAN4w+xDNfv1nE8ArVhmeVe7jDAJ4wWpDs9r9HEUAF6w6LKve1yMEQDQBPLP6U3L1+7uVAHZShiPlPq8hAKIJ4Ke0p2La/b5EAC13GFLv+04ARBMA0eIDSH8bkH7/8QGQTQBEiw4g/fjfJK9DdAAgAKIJgGixASS/770kdT1iA4DWBEA4ARAtOoDU973PJa9DdAAgAKLFB5B8/Lfm/uMDIJsAiCaAlvs2IPW+7wTwU9owpN3vSwRANAHspDwVU+7zGgJ4ZvXhWP3+biUAogngglWfkqve1yME8ILVhmW1+zmKAF6xytCsch9nEMAbZh+e2a//bAK4wqxDNOt19ySAK802TLNd7yjvRl/ATLahqvzHJAz+bZwAd6g6ZFWvqzInwJ0qnQYG/35OgAeNHr7Rrz87J8AB9kPY40Qw9McRwMHOisHQn0MAJ3o+tLcEYeD7+PL16+cPXy/27dvXXi/F5L59/97ldXwIJpoAiCYAogmAaF0D6PXBhrn1nBMnANEEQLTuAXgbxGt6z4cTgGhDAnAKcMmIuXACEG1YAE4B9kbNgxOAaEMDcArQ2tg5cAIQbXgAToFso/d/eACtjV8Exqiw7yUCgFHKBFDhacA3Vfa7TACt1VkUzlVpn0sF0FqtxeF41fa3XACt1VskjlFxX0sG0FrNxeJ+VfezbACt1V00blN5H0sH0FrtxeNt1fevfACt1V9ELpth36YIoLU5FpP/zLJfXb8b9Ci+Y7SuWQZ/M80JsDfbIqeYcV+mPAH2nAbjzTj4m+kD2Aihv5kHf7NMABshnG+Fwd8sF8BGCMdbafA3ywawJ4b7rTj0exEBXCKK/1t92C+JDQBam/T3AHAUARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDR/gVE0d0s9Q70tQAAAABJRU5ErkJggg==">
+<link rel="icon" type="image/png" sizes="192x192" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAElElEQVR4nO3dsY4bNxCGYc2d8uVSuu8AacDpwk3mLtSlClBfckMbr+iVPD974AOe54klnl7g+w63w5njy9evnz/80SDU76MvAEYSANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAER7N/oCRvn27ev99e/fvv975JXMo8f3i8b+kbwebhn4t/6vIM4hgIM9MvTX/lwxHEcABzhr6K95PTE8xofgB/Ue/mqvPzsnwJ0qDd52LU6D2zkB7lBp+PeqXldlToAbzDBgToPbOAGuNMPw7812vaMI4AqzDtOs192TAN4w+xDNfv1nE8ArVhmeVe7jDAJ4wWpDs9r9HEUAF6w6LKve1yMEQDQBPLP6U3L1+7uVAHZShiPlPq8hAKIJ4Ke0p2La/b5EAC13GFLv+04ARBMA0eIDSH8bkH7/8QGQTQBEiw4g/fjfJK9DdAAgAKIJgGixASS/770kdT1iA4DWBEA4ARAtOoDU973PJa9DdAAgAKLFB5B8/Lfm/uMDIJsAiCaAlvs2IPW+7wTwU9owpN3vSwRANAHspDwVU+7zGgJ4ZvXhWP3+biUAogngglWfkqve1yME8ILVhmW1+zmKAF6xytCsch9nEMAbZh+e2a//bAK4wqxDNOt19ySAK802TLNd7yjvRl/ATLahqvzHJAz+bZwAd6g6ZFWvqzInwJ0qnQYG/35OgAeNHr7Rrz87J8AB9kPY40Qw9McRwMHOisHQn0MAJ3o+tLcEYeD7+PL16+cPXy/27dvXXi/F5L59/97ldXwIJpoAiCYAogmAaF0D6PXBhrn1nBMnANEEQLTuAXgbxGt6z4cTgGhDAnAKcMmIuXACEG1YAE4B9kbNgxOAaEMDcArQ2tg5cAIQbXgAToFso/d/eACtjV8Exqiw7yUCgFHKBFDhacA3Vfa7TACt1VkUzlVpn0sF0FqtxeF41fa3XACt1VskjlFxX0sG0FrNxeJ+VfezbACt1V00blN5H0sH0FrtxeNt1fevfACt1V9ELpth36YIoLU5FpP/zLJfXb8b9Ci+Y7SuWQZ/M80JsDfbIqeYcV+mPAH2nAbjzTj4m+kD2Aihv5kHf7NMABshnG+Fwd8sF8BGCMdbafA3ywawJ4b7rTj0exEBXCKK/1t92C+JDQBam/T3AHAUARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDR/gVE0d0s9Q70tQAAAABJRU5ErkJggg==">
 
-  // 3. Регистрация Service Worker (./sw.js)
+<script>
+  window.__deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window.__deferredInstallPrompt = e;
+    var installBtn = document.getElementById('btn-pwa-install');
+    if (installBtn) {
+      installBtn.classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('appinstalled', function() {
+    window.__deferredInstallPrompt = null;
+    var installBtn = document.getElementById('btn-pwa-install');
+    if (installBtn) {
+      installBtn.classList.add('hidden');
+    }
+    if (typeof window.showPwaToast === 'function') {
+      window.showPwaToast('✅ Приложение «Лимиты Avito» успешно установлено!');
+    }
+  });
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
       navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function() {});
