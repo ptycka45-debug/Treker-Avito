@@ -1,5 +1,5 @@
 ```javascript
-const CACHE_NAME = 'avito-treker-pwa-v5';
+const CACHE_NAME = 'avito-treker-pwa-v6';
 
 const ASSETS = [
   './',
