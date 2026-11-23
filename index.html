@@ -1234,16 +1234,17 @@ function computeAnalyticsForProfile(prof) {
 }
 
 function renderAll() {
-  const p1Active = computeAnalyticsForProfile('p1').activeAds;
-  const p2Active = computeAnalyticsForProfile('p2').activeAds;
-  document.getElementById('nav-p1-count').textContent = p1Active.length;
-  document.getElementById('nav-p2-count').textContent = p2Active.length;
+  const p1ActiveUnsold = computeAnalyticsForProfile('p1').activeAds.filter(a => !a.isSold);
+  const p2ActiveUnsold = computeAnalyticsForProfile('p2').activeAds.filter(a => !a.isSold);
+  document.getElementById('nav-p1-count').textContent = p1ActiveUnsold.length;
+  document.getElementById('nav-p2-count').textContent = p2ActiveUnsold.length;
 
   renderDashboard();
   renderAdsTable('p1');
   renderAdsTable('p2');
   renderCatalog();
 }
+
 
 
 function renderDashboard() {
